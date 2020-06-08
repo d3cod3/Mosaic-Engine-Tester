@@ -51,7 +51,6 @@ void ofApp::draw(){
             it->second->draw();
         }
 
-        ImGui::End();
     }
 
     this->gui.end();
