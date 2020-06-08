@@ -19,6 +19,10 @@ Project{
             'src/mosaicNode.h',
             'src/ofApp.cpp',
             'src/ofApp.h',
+            'src/ofxVPHasUid.cpp',
+            'src/ofxVPHasUid.h',
+            'src/mosaicParameters.cpp',
+            'src/mosaicParameters.h',
         ]
 
         of.addons: [
