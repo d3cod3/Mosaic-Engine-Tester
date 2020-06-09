@@ -5,7 +5,6 @@ void mosaicNode::setup(){
 
     // fixed node content to one inlet/outlet/param for each type
 
-
     // VP_LINK_NUMERIC
     _inletParams[0] = new float();
     *(float *)&_inletParams[0] = 0.0f;
@@ -64,6 +63,13 @@ void mosaicNode::setup(){
     static_cast<ofSoundBuffer *>(_outletParams[4])->set(0.0f);
 
     *static_cast<ofPixels *>(_inletParams[5]) = kuro->getPixels();
+
+    // - - - - - - - - - -
+    // Setup parameters (as above, new way)
+    //parameters.push_back( std::make_shared< AbstractParameter >( myFloatParam ) );
+    parameters.push_back( &myFloatParam );
+    parameters.push_back( &myStringParam );
+    parameters.push_back( &myIntParam );
 }
 
 //--------------------------------------------------------------
@@ -120,6 +126,12 @@ void mosaicNode::draw(){
 
         // NEED TO ADD ofPixels
 
+        // Automatic Parameters drawing.
+        ImGui::Separator();
+
+        for(auto it=parameters.begin(); it!=parameters.end(); ++it){
+            (*it)->drawImGuiEditable();
+        };
     }
     ofxImGui::EndWindow(mainSettings);
 }

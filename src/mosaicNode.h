@@ -5,6 +5,8 @@
 #include "ofxImGui.h"
 #include "imgui_stdlib.h"
 
+#include "mosaicParameters.h"
+
 #define MAX_PARAMS 36
 
 enum LINK_TYPE {
@@ -29,8 +31,12 @@ class mosaicNode {
 
 public:
 
-    mosaicNode() {}
-    mosaicNode(int _id) { this->_id = _id; }
+    mosaicNode() {
+        mosaicNode(-1);
+    }
+    mosaicNode(int _id) : myFloatParam("myStringName"), myStringParam("myStringName"), myIntParam("myIntName") {
+        this->_id = _id;
+    }
 
     void setup();
     void update(std::map<int,std::shared_ptr<mosaicNode>> &nodes);
@@ -60,4 +66,13 @@ public:
     ofImage                                         *kuro;
 
 
+    // Parameters
+    //std::vector<std::shared_ptr<AbstractParameter> >parameters; // I tried with make_shared... which is a garbage collector, which in fact we don't really need as Parameters will ensure instances' validity ?
+    std::vector<AbstractParameter*> parameters;
+
+    // Customise this node (to be in a derived mosaicNode)
+    // Static Parameters
+    Parameter<float> myFloatParam;
+    Parameter<std::string> myStringParam;
+    Parameter<int> myIntParam;
 };

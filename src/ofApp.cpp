@@ -24,6 +24,8 @@ void ofApp::setup(){
 
     nodesMap[0]->connectFrom(nodesMap,2,0,0,VP_LINK_NUMERIC);
     nodesMap[1]->connectFrom(nodesMap,2,1,1,VP_LINK_ARRAY);
+    // new way ?
+    //nodesMap[0]->parameters.front()->connectWith( nodesMap[1]->parameters.front() );
 
 }
 
@@ -51,7 +53,6 @@ void ofApp::draw(){
             it->second->draw();
         }
 
-        ImGui::End();
     }
 
     this->gui.end();
