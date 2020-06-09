@@ -147,7 +147,7 @@ public:
         if ( ENABLE_OUTLET ) {
             return true; // todo
         }
-        return false; // todo
+        return false;
     };
 
     // From AbstractParameter
@@ -186,6 +186,8 @@ public:
     // Non abstract API functions (typed)
     DATA_TYPE getValue() const;
     bool setValue(DATA_TYPE _newValue);
+
+    // todo: forbid copy constructor to prevent creating accidental copies ?
 
 // private:
     std::list<PinLink*> links;

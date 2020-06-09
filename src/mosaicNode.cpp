@@ -70,6 +70,11 @@ void mosaicNode::setup(){
     parameters.push_back( &myFloatParam );
     parameters.push_back( &myStringParam );
     parameters.push_back( &myIntParam );
+
+    // Other way for dynamic params
+    myDynamicParams.resize(0);
+    myDynamicParams.emplace_back( "MyDynamicParameter" );
+    parameters.push_back( &myDynamicParams.at(0) );
 }
 
 //--------------------------------------------------------------

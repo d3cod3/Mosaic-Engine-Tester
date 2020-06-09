@@ -75,4 +75,5 @@ public:
     Parameter<float> myFloatParam;
     Parameter<std::string> myStringParam;
     Parameter<int> myIntParam;
+    std::vector< Parameter<int> > myDynamicParams;
 };
