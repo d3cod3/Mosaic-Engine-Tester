@@ -23,7 +23,7 @@ void ofApp::setup(){
     // TESTING CONNECT/DISCONNECT
 
     nodesMap[0]->connectFrom(nodesMap,2,0,0,VP_LINK_NUMERIC);
-    nodesMap[1]->connectFrom(nodesMap,2,1,1,VP_LINK_ARRAY);
+    nodesMap[1]->connectFrom(nodesMap,2,1,1,VP_LINK_STRING);
     // new way ?
     //nodesMap[0]->parameters.front()->connectWith( nodesMap[1]->parameters.front() );
 
