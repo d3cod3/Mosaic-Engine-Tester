@@ -9,16 +9,6 @@
 
 #define MAX_PARAMS 36
 
-enum LINK_TYPE {
-    VP_LINK_NUMERIC,
-    VP_LINK_STRING,
-    VP_LINK_ARRAY,
-    VP_LINK_TEXTURE,
-    VP_LINK_AUDIO,
-    VP_LINK_SPECIAL,
-    VP_LINK_PIXELS
-};
-
 struct PatchLink{
     int                     id;
     int                     type;

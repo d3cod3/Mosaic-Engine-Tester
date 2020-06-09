@@ -52,15 +52,45 @@
 
 // Define link types.
 // Todo: make this a factory.
-// enum allLinkTypes;
+// all possible links
+enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
+    //VP_LINK_UNDEFINED = 777, // NULLPTR / UNDEFINED_TYPE equivalence ??
+    VP_LINK_NUMERIC = 0,
+    VP_LINK_STRING = 1,
+    VP_LINK_ARRAY = 2,
+    VP_LINK_TEXTURE = 3,
+    VP_LINK_AUDIO = 4,
+    VP_LINK_SPECIAL = 5,
+    VP_LINK_PIXELS = 6
+};
 
-class AbstractParameter;
+// compile-time utility for converting type-values to assiociated linktype
+// maybe ?
+#define getLinkType(X) _Generic((X), \
+    long double: VP_LINK_NUMERIC, \
+    float: VP_LINK_NUMERIC, \
+    int: VP_LINK_NUMERIC, \
+    std::string : VP_LINK_STRING, \
+    char[]: VP_LINK_STRING, \
+    array: VP_LINK_ARRAY, \
+    ofTexture: VP_LINK_TEXTURE, \
+    ofSoundBuffer: VP_LINK_SPECIAL, \
+    ofAudioBuffer: VP_LINK_AUDIO, \
+    ofPixels: VP_LINK_PIXELS, \
+    default: VP_LINK_NUMERIC  \
+);
+
 class AbstractHasInlet;
+class AbstractHasOutlet;
 
-class PinLink {
+class PinLink : ofxVPHasUID {
+    PinLink( AbstractHasOutlet& _parent ) : ofxVPHasUID("PinLink"), fromPin(_parent) {
+
+    };
+
     bool isConnected;
     //bool isEnabled; needed ??
-    AbstractParameter* fromPin;
+    const AbstractHasOutlet& fromPin;
     AbstractHasInlet* toPin;
 };
 
@@ -73,9 +103,18 @@ class PinLink {
 class AbstractParameter : public ofxVPHasUID {
 public:
     //AbstractParameter() : ofxVPHasUID("AbstractParameter") {};
-    AbstractParameter( std::string _paramName = "AbstractParameter") : ofxVPHasUID(_paramName){};
+    AbstractParameter( std::string _paramName = "AbstractParameter") : ofxVPHasUID(_paramName){
+        // Remember / Register
+        allParams.push_back(this);
+    };
 
-    virtual ~AbstractParameter(){};// = 0;
+    virtual ~AbstractParameter(){
+        // de-register param
+        std::vector<AbstractParameter*>::iterator exists = std::find(allParams.begin(), allParams.end(), this );
+        if( exists != allParams.end() ){
+            allParams.erase(exists);
+        }
+    };
 
     // API methods
     virtual bool saveToXML() const = 0;
@@ -89,23 +128,53 @@ public:
     const bool& dataHasChanged() const {
         return bFlagDataChanged;
     }
+    bool bFlagDataChanged = false;
 
     // conversion
     AbstractParameter& getAsAbstract(){ return *this; };
 
+    // Factory (tmp in here as a static)
+    static const std::vector<AbstractParameter*>& getAllParams() { return allParams; };//const_cast< std::vector< AbstractParam* > >(allParams); };
 protected:
-    bool bFlagDataChanged = false;
+    static std::vector<AbstractParameter*> allParams;
+
+};
+
+// - - - - - - - - - -
+// Ensures an interface between outlets and inlets (which inherit from :haspin)
+class HasPin {
+public:
+    HasPin() {}
+    virtual ~HasPin(){}
+
+    // Pin event listeners
+    virtual void onPinConnected()=0;
+    virtual void onPinDisconnected()=0;
+
+    ImVec2 pinPosition;
+    //ofxVPHasUID::stringKeyType owningObjectID; // needed ?
+
+private :
+    // This is an abstract you have to implement to detach pin data
+    //virtual void detach() = 0;
 };
 
 // - - - - - - - - - -
 
-class AbstractHasInlet {
+class AbstractHasInlet : public HasPin {
 public:
 
     virtual bool acceptsLinkType() = 0;
     //virtual accept();
-    virtual bool connectWith() = 0;
+    virtual bool connectWithOutlet() = 0; // return bool or PinLink&  ?
+    virtual bool disconnectPin() = 0;
 
+    // Events
+    virtual void onPinConnected() override = 0;
+    virtual void onPinDisconnected() override = 0;
+    virtual void triggerValueChanged() = 0;
+
+    std::shared_ptr<PinLink> connectedLink;
 };
 
 template<typename ACCEPT_TYPE>
@@ -114,15 +183,22 @@ public:
     // todo
 };
 
-class AbstractHasOutlet {
+class AbstractHasOutlet : public HasPin {
 public:
     // todo
+    std::vector<PinLink> pinLinks;
+
+    //const std::string dataLabel;
+    //const LinkType linkType;
+    virtual void visualiseData() = 0;
+    bool bFlagDataChanged;
 };
 
 template<typename ACCEPT_TYPE>
 class HasOutlet : public AbstractHasOutlet {
 public:
     // todo
+    // store dataref ?
 };
 
 template<typename DATA_TYPE, bool ENABLE_OUTLET=true>
@@ -143,12 +219,22 @@ public:
     bool acceptsLinkType() override {
         return false; // todo
     };
-    bool connectWith() override{
+    bool connectWithOutlet() override {
         if ( ENABLE_OUTLET ) {
             return true; // todo
         }
         return false;
     };
+    virtual bool disconnectPin() override {
+        return true; // todo
+    }
+    virtual void onPinConnected() override {};
+    virtual void onPinDisconnected() override {};
+    virtual void triggerValueChanged() override {};
+
+    // From HasOutlet
+    virtual typename std::enable_if<ENABLE_OUTLET>::type
+    visualiseData() override {};
 
     // From AbstractParameter
     bool saveToXML() const override {
@@ -184,12 +270,38 @@ public:
 
 
     // Non abstract API functions (typed)
-    DATA_TYPE getValue() const;
-    bool setValue(DATA_TYPE _newValue);
+    // Maybe these need to be virtual methods ?
+    const DATA_TYPE& getValue() const {
+        return dataValue;
+    };
+    DATA_TYPE getValueCopy() const {
+        return dataValue;
+    };
+    bool setValue( const DATA_TYPE& _newValue){
+        dataValue = _newValue;
+        return true;
+    };
+    // Experimental: alternative method to getValue() the value dereferencing the pointer
+    const DATA_TYPE& operator->(){
+        return getValue();
+    }
+
+    // Utilities
+    // Cast Parameter<type> to type.
+    const DATA_TYPE& operator=(const Parameter<DATA_TYPE,ENABLE_OUTLET>& _param) const{
+        return getValue();
+    }
+    // Move assignment operator
+//    DATA_TYPE& operator=(const Parameter<DATA_TYPE,ENABLE_OUTLET>&& _param){
+//        return getValue();
+//    }
+    // implicit conversion operator
+    operator const DATA_TYPE&() { return getValue(); }
+
 
     // todo: forbid copy constructor to prevent creating accidental copies ?
 
 // private:
-    std::list<PinLink*> links;
     DATA_TYPE dataValue;
+    DATA_TYPE storedValue; // for save/load
 };
