@@ -175,12 +175,28 @@ public:
     virtual void triggerValueChanged() = 0;
 
     std::shared_ptr<PinLink> connectedLink;
+
 };
+
+template<typename T> class ParamModifier;
+template<typename T> class ParamInletModifier;
 
 template<typename ACCEPT_TYPE>
 class HasInlet : public AbstractHasInlet {
 public:
-    // todo
+    HasInlet(){};
+    virtual ~HasInlet(){
+        for(ParamModifier<ACCEPT_TYPE>* modifier : paramModifiers){
+            delete modifier;
+        }
+        paramModifiers.clear();
+    };
+    void addModifier(){
+        // tmp, only inletmodifiers
+        paramModifiers.push_back( new ParamInletModifier<ACCEPT_TYPE>() );
+    }
+protected:
+    std::list<ParamModifier<ACCEPT_TYPE>*> paramModifiers; // stores ptr but owns them. Be sure to clean memory!
 };
 
 class AbstractHasOutlet : public HasPin {
@@ -213,6 +229,7 @@ public:
 //        ofLogNotice(std::string(OFXVP_DEBUG_PARAMS_PREPEND)+"_primary") <<  __PRETTY_FUNCTION__;
 //# endif
     };
+    using HasInlet<DATA_TYPE>::paramModifiers;
 
     // Abstract functions
     // From HasInlet
@@ -272,12 +289,45 @@ public:
     // Non abstract API functions (typed)
     // Maybe these need to be virtual methods ?
     const DATA_TYPE& getValue() const {
+        // Returns baseValue() which gets the constant parameter value from derived classes.
+        // Eventually replace that value with a modified one, if modifiers exist
+        switch(this->paramModifiers.size()) {
+            case 0: {
+                // return base
+                return this->baseValue();
+                break;
+            }
+            case 1: {
+                //std::cout << "ModifierStackSize=" << paramModifiers.size() << std::endl;
+                return this->paramModifiers.back()->transformValue( this->baseValue() );
+                break;
+            }
+            default: {
+                // chain modifiers. Todo: define correct chaining order.
+                // Const_cast is temp hack until const-correctness is OK. This is UNDEFINED BEHAVIOUR, non standard !
+                // but as the function returns it as a const ref again, it should work.
+                // Only because we cannot re-assign a const ref.
+                DATA_TYPE& retValue = const_cast<DATA_TYPE&>(this->baseValue());
+                //static int i; // static so it doesn't re-allocate on every getValue() call
+                //i=0;
+                for(ParamModifier<DATA_TYPE>* modifier : this->paramModifiers){
+                    //if(i==0)
+                    retValue = modifier->transformValue(retValue);
+                    //i++;
+                }
+                return retValue;
+                break;
+            }
+        }
         return dataValue;
     };
     DATA_TYPE getValueCopy() const {
         return dataValue;
     };
-    bool setValue( const DATA_TYPE& _newValue){
+    virtual const DATA_TYPE& getBaseValue() const { // base (saved) value
+        return dataValue;
+    }
+    bool setBaseValue( const DATA_TYPE& _newValue){
         dataValue = _newValue;
         return true;
     };
@@ -304,4 +354,47 @@ public:
 // private:
     DATA_TYPE dataValue;
     DATA_TYPE storedValue; // for save/load
+};
+
+// - - - - - - - - - -
+class abstractParamModifier  : public ofxVPHasUID {
+//    abstractParamModifier() : ofxVPHasUID("ParamModifier") {
+//    }
+protected:
+    abstractParamModifier(const std::string& _modifierName = "ParamModifier") : ofxVPHasUID(_modifierName) {
+
+    }
+    // Chaining ?
+    //virtual void transformValue() = 0;
+    //const AbstractParam& parent;
+    //const std::string name;
+};
+template<typename T>
+class ParamModifier : public abstractParamModifier {
+public:
+    ParamModifier(const std::string& _modifierName = "ParamModifier") : abstractParamModifier(_modifierName){}
+    virtual ~ParamModifier(){};
+    virtual const inline T& transformValue(const T& _prevValue) const = 0;
+};
+
+template<typename T>
+class ParamInletModifier : public ParamModifier<T>, protected HasInlet<T> {
+public:
+    ParamInletModifier() : ParamModifier<T>("Pin Inlet"), HasInlet<T>() {
+
+    }
+    virtual ~ParamInletModifier(){};
+
+    // Note: inline is needed so it can be defined once later in the code. Defining it here lead to duplicater symbols linker errors.
+    virtual const inline T& transformValue(const T& _prevValue) const override {
+        //std::cout << "ParamModifier<T>::transformValue() UNTYPED !!!!" << std::endl;
+        return _prevValue;
+    }
+    //mutable bool isConnected;
+    mutable PinLink* inlet;
+
+    // Inherited
+    virtual void triggerValueChanged() override {};
+    virtual void onPinDisconnected() override {};
+    virtual void onPinConnected() override {};
 };
