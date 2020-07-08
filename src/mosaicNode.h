@@ -24,7 +24,7 @@ public:
     mosaicNode() {
         mosaicNode(-1);
     }
-    mosaicNode(int _id) : myFloatParam("myStringName"), myStringParam("myStringName"), myIntParam("myIntName") {
+    mosaicNode(int _id) : myFloatParam("myFloatName"), myStringParam("myStringName"), myIntParam("myIntName") {
         this->_id = _id;
     }
 

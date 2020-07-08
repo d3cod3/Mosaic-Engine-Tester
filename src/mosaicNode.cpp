@@ -75,6 +75,7 @@ void mosaicNode::setup(){
     myDynamicParams.resize(0);
     myDynamicParams.emplace_back( "MyDynamicParameter" );
     parameters.push_back( &myDynamicParams.at(0) );
+    //myFloatParam.getAsInlet().connectWithOutlet(myStringParam.getAsOutlet());
 }
 
 //--------------------------------------------------------------
@@ -145,7 +146,7 @@ void mosaicNode::draw(){
 bool mosaicNode::connectFrom(std::map<int,std::shared_ptr<mosaicNode>> &nodes, int fromObjectID, int fromOutlet, int toInlet, int linkType){
 
     // CONNECT FROM "SOME" OBJECT WITH THIS ONE (DRAGGING LINK FROM ANOTHER OBJECT TO SOME INLET OF THIS OBJECT)
-
+#ifdef SKIPTHISOLDPART
     bool connected = false;
 
     if( (nodes[fromObjectID] != nullptr) && (fromObjectID!=this->_id) && (this->_id != -1) ){
@@ -183,7 +184,57 @@ bool mosaicNode::connectFrom(std::map<int,std::shared_ptr<mosaicNode>> &nodes, i
     }
 
     return connected;
+#else
+    if( (nodes[fromObjectID] != nullptr) && (fromObjectID!=this->_id) && (this->_id != -1) ){
+        // todo: if link is connected -> disonnect ?
+        //if(this->)
 
+        // Get own parameter to connect
+        if( parameters[toInlet] != nullptr){
+            AbstractHasModifier& toParam = parameters[toInlet]->getAsHasModifier();
+            //AbstractParameter& toFullTmp = *parameters[toInlet];
+            //auto& toParamAlt = *parameters[toInlet];
+            auto& fromNode = nodes[fromObjectID];
+            auto& fromParam = fromNode->parameters[fromOutlet];
+            //std::cout << "InletToParam=" << parameters[toInlet]->getUID() << " / " << fromParam->getUID() << std::endl;
+
+            if(!fromParam->hasOutlet()){
+                cout << "mosaicNode::connectFrom() : FromParameter ain't got no outlet ! (aborting)"  << endl;
+                return false;
+            }
+            else {
+                //AbstractHasInlet& toInlet = toParam
+                //fromParam->getAsOutlet().c
+                //InletModifier& toParam.getModifier< InletModifier >();
+            }
+
+            //toTmp->getAsInlet().onPinConnected();
+            std::cout << "mosaicNode::connectFrom() --> connecting parameter, from["<< fromOutlet <<"]=" << fromParam->getUID() << ", to["<< toInlet <<"]=" << parameters[toInlet]->getUID() << endl;//"/" << toTmp->getAsAbstract().dataHasChanged() << "/" << toParam.acceptsLinkType(VP_LINK_NUMERIC) << std::endl;
+
+            //parameters[toInlet]->
+            try {
+                AbstractHasOutlet& outlet = fromParam->getAsOutlet();
+                //fromParam->getAsInlet();
+                //assert( &outlet == NULL );
+                return toParam.connectWithOutlet( outlet );
+            }
+            catch(VPError _error){
+                std::cout << "Cannot convert to outlet! (normal) -- " << _error << std::endl;
+                return false;
+            }
+            catch(...){
+                // Parameter has no outlet !
+                std::cout << "Cannot convert to outlet! (normal)" << std::endl;
+                return false;
+            };
+        }
+        else {
+            ofLogNotice("MosaicNode") << "Pin connection failed : fromOutlet("<< fromOutlet << ") doesn't exist.";
+        }
+    }
+    std::cout << "mosaicNode::connectFrom() --> failed to connect" << std::endl;
+    return false;
+#endif
 }
 
 //--------------------------------------------------------------
