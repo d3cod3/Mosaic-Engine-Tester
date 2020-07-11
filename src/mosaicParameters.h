@@ -207,7 +207,7 @@ protected:
 class HasPin {
 public:
     HasPin(LinkType _linkType = VP_LINK_UNDEFINED) : linkType(_linkType) {
-        std::cout << "New Pin : " << ToString(_linkType) << " - " << std::endl;
+        //std::cout << "New Pin : " << ToString(_linkType) << " - " << std::endl;
     };
     virtual ~HasPin(){};
 
@@ -365,7 +365,7 @@ public:
         throw VPError( VPErrorCode_MODIFIER, VPErrorStatus_NOTICE, "The modifier was not found and can not yet be added." );
     };
     template<typename MODIFIER_TYPE>
-    bool hasModifier() {
+    bool hasModifier() const {
         // Ensure correct usage by allowing only deriveds of abstractParamModifier
         static_assert(std::is_base_of<abstractParamModifier, MODIFIER_TYPE>::value, "MODIFIER_TYPE should inherit from abstractParamModifier* !!!");
 
@@ -378,8 +378,10 @@ public:
             }
             return false;
         //}
+    };
 
-        return false; // todo
+    int getNumModifiers() const {
+        return abstractParamModifiers.size();
     };
 
     // TYPED API METHODS
@@ -434,9 +436,7 @@ public:
         // Search for any existing one
         for(ParamModifier<ACCEPT_TYPE>* pm : paramModifiers){
             if( pm->modifierType == MODIFIER_TYPE::modifierType ){
-                std::cout << "Found existing modifier !" << std::endl;
                 return static_cast< MODIFIER_TYPE& >(*pm);
-                //break;
             }
         }
 
@@ -461,7 +461,7 @@ public:
 //# ifdef OFXVP_DEBUG_PARAMS
 //        ofLogNotice(std::string(OFXVP_DEBUG_PARAMS_PREPEND)+"_primary") <<  __PRETTY_FUNCTION__;
 //# endif
-        std::cout << "After " << this->getUID() << " (done)" << std::endl;
+        //std::cout << "After " << this->getUID() << " (done)" << std::endl;
     };
     using HasModifier<DATA_TYPE>::paramModifiers;
 
@@ -547,7 +547,7 @@ public:
     // Non abstract API functions (typed)
 
     // Returns baseValue() which gets the constant parameter value from derived classes.
-    // Eventually replace that reference with a modified one, if modifiers exist
+    // Eventually replace that reference with a modified one, if modifiers exist. (variable routing function)
     const DATA_TYPE& getValue() const {
         // todo: Check/Fix references, allow to re-assign references ? References should be re-assignable, but point to const values so they cannot be messed with.
         // Ressource: https://isocpp.org/wiki/faq/references#reseating-refs
@@ -558,7 +558,6 @@ public:
                 break;
             }
             case 1: {
-                //std::cout << "ModifierStackSize=" << paramModifiers.size() << std::endl;
                 return this->paramModifiers.back()->transformValue( this->getBaseValue() );
                 break;
             }

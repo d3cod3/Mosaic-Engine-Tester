@@ -73,9 +73,26 @@ void mosaicNode::setup(){
 
     // Other way for dynamic params
     myDynamicParams.resize(0);
-    myDynamicParams.emplace_back( "MyDynamicParameter" );
-    parameters.push_back( &myDynamicParams.at(0) );
-    //myFloatParam.getAsInlet().connectWithOutlet(myStringParam.getAsOutlet());
+    int rand = random() % 5;
+    //std::cout << "Creating " << rand << " dynamic params in Node " << this->_id << "."<< std::endl;
+    for(int i=0; i<rand; i++){
+        myDynamicParams.emplace_back( "MyDynamicParameter" );
+        AbstractParameter* insertedParam = &myDynamicParams.back();
+        parameters.push_back( insertedParam );
+        std::cout << "insertedParam @ " << insertedParam << ", name=" << insertedParam->getUID() << std::endl;
+    }
+    if(false){ // tmp4debug
+        std::cout << "After inserting, dynamicParams : ";
+        for(AbstractParameter& p : myDynamicParams){
+            std::cout << &p << " (" << p.getUID() << "), ";
+        }
+        std::cout << std::endl;
+        std::cout << "After inserting, allParams : ";
+        for(AbstractParameter* p : parameters){
+            std::cout << p << " (" << p->getUID() << "), ";
+        }
+        std::cout << std::endl;
+    }
 }
 
 //--------------------------------------------------------------
@@ -133,6 +150,8 @@ void mosaicNode::draw(){
         // NEED TO ADD ofPixels
 
         // Automatic Parameters drawing.
+        ImGui::Separator();
+        ImGui::TextUnformatted("NEW PARAMETER API");
         ImGui::Separator();
 
         for(auto it=parameters.begin(); it!=parameters.end(); ++it){

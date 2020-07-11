@@ -26,26 +26,52 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e){
 }
 
 // Inline utility
-void ImGuiShowParamNameOnRightClick(const AbstractParameter& _param){
+template<class FULLTYPE, typename DATATYPE>
+inline void ImGuiShowParamInfoOnRightClick(const FULLTYPE& _param){
     // Show unique ID when clicking on the label (tmp?)
     if(ImGui::IsMouseDown(0) && !ImGui::IsItemActive() && ImGui::IsItemHovered() && ImGui::IsWindowFocused() && 0 == ImGui::GetMouseDragDelta(0).x){
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
         ImGui::TextUnformatted( _param.getUID().c_str() );
+
+        ImGui::LabelText("HasOutlet", "%s", _param.hasOutlet()?"1":"0" );
+        ImGui::LabelText("Modifiers", "%i", _param.getNumModifiers() );
+        try {
+            if( _param.template hasModifier< ParamInletModifier< DATATYPE > >() ){
+                ParamInletModifier< DATATYPE >& paramInlet = const_cast<FULLTYPE&>( _param ).template getOrCreateModifier< ParamInletModifier< DATATYPE > >();
+                ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"1":"0" );
+            }
+            else {
+                 ImGui::LabelText( "InletModifier", "%s", "None" );
+            }
+        } catch(...) {
+            ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
+        }
+        ImGui::Separator();
+        std::ostringstream storedValue;     std::ostringstream outputValue;     std::ostringstream baseValue;
+        storedValue << _param.dataValue;    outputValue << _param.getValue();   baseValue << _param.getBaseValue();
+        ImGui::LabelText("storedValue", "%s",   storedValue.str().c_str() );
+        ImGui::LabelText("baseValue", "%s",     baseValue.str().c_str());
+        ImGui::LabelText("outputValue", "%s",   outputValue.str().c_str() );
+
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
     }
+
 };
 
 // TYPE some parameters
 template<>
 void Parameter<int>::drawImGui() const {
+    ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
     // todo: remove const_cast somehow ?
     ImGui::DragInt(this->getDisplayName().c_str(), const_cast<int*>(&this->getValue()) );
-    ImGuiShowParamNameOnRightClick(*this);
+    ImGuiShowParamInfoOnRightClick< Parameter<int>, int >(*this);
+    ImGui::PopID();
 };
 template<>
 void Parameter<float>::drawImGui() const {
+    ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
     // todo: remove const_cast somehow ?
     ImGui::DragFloat(this->getDisplayName().c_str(), const_cast<float*>(&this->getValue()) );//const_cast<float*>(&this->getValue()) );
 
@@ -59,12 +85,14 @@ void Parameter<float>::drawImGui() const {
         std::endl;
     }
 
-    ImGuiShowParamNameOnRightClick(*this);
+    ImGuiShowParamInfoOnRightClick< Parameter<float>, float >(*this);
+    ImGui::PopID();
 };
 template<>
 void Parameter<std::string>::drawImGui() const {
+    ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
     // todo: remove const_cast somehow ?
     ImGui::InputText(this->getDisplayName().c_str(), static_cast<std::string *>( const_cast<std::string*>(&this->getValue() )));
-    ImGuiShowParamNameOnRightClick(*this);
-
+    ImGuiShowParamInfoOnRightClick< Parameter<std::string>, std::string >(*this);
+    ImGui::PopID();
 };

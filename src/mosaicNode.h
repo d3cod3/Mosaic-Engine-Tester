@@ -65,5 +65,5 @@ public:
     Parameter<float> myFloatParam;
     Parameter<std::string> myStringParam;
     Parameter<int> myIntParam;
-    std::vector< Parameter<int> > myDynamicParams;
+    std::list< Parameter<int> > myDynamicParams; // note: cannot be vector, it re-allocates stored items, unvalidating pointers / references !
 };
