@@ -563,15 +563,12 @@ public:
                 break;
             }
             default: {
-                // chain modifiers. Todo: implement const-correct chaining.
-                // Const_cast is temp hack until const-correctness is OK. This is UNDEFINED BEHAVIOUR, non standard !
-                // but as the function returns it as a const ref again, it should work.
-                // Only because we cannot re-assign a const ref.
-                DATA_TYPE& retValue = const_cast<DATA_TYPE&>(this->getBaseValue());
+                // chain modifiers
+                const DATA_TYPE* retValue = &this->getBaseValue();// const_cast<const DATA_TYPE*>(&this->getBaseValue());
                 for(ParamModifier<DATA_TYPE>* modifier : this->paramModifiers){
-                    retValue = modifier->transformValue(retValue);
+                    retValue = &modifier->transformValue(*retValue);
                 }
-                return retValue;
+                return *retValue;
                 break;
             }
         }
@@ -619,7 +616,7 @@ class ParamModifier : public abstractParamModifier {
 public:
     ParamModifier(  const AbstractHasModifier& _parent, const enum OFXVP_MODIFIER_& _modifierType  ) : abstractParamModifier( _parent, _modifierType ){}
     virtual ~ParamModifier(){};
-    virtual const inline T& transformValue(const T& _prevValue) const = 0;
+    virtual const inline T& transformValue(const T& _originalValue) const = 0;
 };
 
 template<typename MODIFIER_TYPE>
@@ -632,14 +629,15 @@ public:
     virtual ~ParamInletModifier(){};
 
     // Note: inline is needed so it can be defined once later in the code. Defining it here lead to duplicated symbols linker errors.
-    virtual const inline MODIFIER_TYPE& transformValue(const MODIFIER_TYPE& _prevValue) const override {
+    // Todo : move it to .cpp file ?
+    virtual const inline MODIFIER_TYPE& transformValue(const MODIFIER_TYPE& _originalValue) const override {
         //std::cout << "ParamModifier<T>::transformValue() UNTYPED !!!!" << std::endl;
         if( myLink.isConnected ){
             return myLink.fromPin->getOutputValue();
         }
 
         // Or leave the value untouched
-        return _prevValue;
+        return _originalValue;
     }
 
     // - - - - - - - - - -
