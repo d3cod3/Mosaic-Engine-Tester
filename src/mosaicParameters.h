@@ -162,6 +162,7 @@ public:
     AbstractParameter( std::string _paramName = "AbstractParameter") : ofxVPHasUID(_paramName){
         // Remember / Register
         allParams.push_back(this);
+        //std::cout << "New Abstract Param = " << this << std::endl;
     };
 
     virtual ~AbstractParameter(){
@@ -179,9 +180,8 @@ public:
     virtual bool unserialize() = 0;
     //virtual void update() = 0; // needed ?
     virtual void drawImGuiEditable() = 0;
-    virtual void drawImGui() const = 0; // needed ?
+    virtual void drawImGui() = 0; // needed ?
     // these 2 prevent the need of virtual inheritance, which keeps things easier
-    virtual AbstractHasInlet& getAsInlet() = 0;
     virtual AbstractHasModifier& getAsHasModifier() = 0;
     virtual bool hasOutlet() const = 0;
     virtual AbstractHasOutlet& getAsOutlet() = 0;
@@ -409,9 +409,10 @@ public:
         return true;
     };
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {
-        std::cout << "HasModifier<T=" << getLinkName<ACCEPT_TYPE>() << ">::connectWithOutlet() --> connecting parameter" << std::endl;
+        //std::cout << "HasModifier<T=" << getLinkName<ACCEPT_TYPE>() << ">::connectWithOutlet() --> connecting parameter" << std::endl;
 
         // pre-check if potentialy compatible. todo
+        // Don't connect with self !
 //        if( !acceptsLinkType( _outlet.linkType ) ){
 //        if( ACCEPT_TYPE != _outlet.linkType ){
 //            std::cout << "Parameter<T>::connectWithOutlet() --> incompatible link type !" << std::endl;
@@ -444,7 +445,7 @@ public:
         auto* newModifierInstance = new MODIFIER_TYPE( *this );
         paramModifiers.push_back( newModifierInstance );
         abstractParamModifiers.push_back( newModifierInstance );
-        std::cout << "Created a brand new modifier !" << std::endl;
+        //std::cout << "Created a brand new modifier !" << std::endl;
         return *newModifierInstance;
     };
 
@@ -506,7 +507,7 @@ public:
         // Default falls back to uneditable method
         this->drawImGui();
     };
-    void drawImGui() const override {
+    void drawImGui() override {
         // Fallback behaviour for any type : Try to display without editing capabilities.
         std::ostringstream serialized;
         serialized << this->dataValue; // &this->dataValue; --> displays variable address
@@ -521,13 +522,6 @@ public:
     };
     virtual AbstractHasModifier& getAsHasModifier() override {
         return *this;
-    };
-    virtual AbstractHasInlet& getAsInlet() override { // todo : remove / change this
-        //AbstractHasModifier& tmpMod = *this;
-        //tmpMod.addModifier();
-        //AbstractHasInlet& tmp = *this;//((AbstractHasInlet*) this);
-        //return *((AbstractHasInlet*) this);
-        return *((AbstractHasInlet*) this); // todo: this is completely wrecked. Do not use.
     };
     virtual bool hasOutlet() const override final {
         return ENABLE_OUTLET;
@@ -602,9 +596,143 @@ public:
 
     // todo: forbid copy constructor to prevent creating accidental copies and only allow refs ?
 
-// private:
+    // ImGui Helpers
+protected:
+    void ImGuiListenForParamDrop(){
+        if ( ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VPPARAM_OUTLET_TO_INLET")){
+                //IM_ASSERT(payload->DataSize == sizeof(ofxVPHasUID::stringKeyType::value_type*));
+                ofxVPHasUID::stringKeyType outletParmName = static_cast<ofxVPHasUID::stringKeyType::value_type*>(payload->Data);//static_cast<std::string*>((*data));
+
+                // try to connect
+                if( ofxVPHasUID* outletHasUID = ofxVPHasUID::getInstanceByUID(outletParmName) ){
+                    // Don't connect with self !
+                    if( static_cast<ofxVPHasUID*>(this) == outletHasUID ){
+                        ofLogNotice("Parameter") << "Notice: Not connecting the parameter with itself !" << std::endl;
+                    }
+                    else {
+                        // try to parse it as a parameter
+                        if( AbstractParameter* outletAbstract = dynamic_cast<AbstractParameter*>(outletHasUID)){
+                            if(outletAbstract->hasOutlet()){
+                                try {
+                                    if( this->getAsHasModifier().connectWithOutlet( outletAbstract->getAsOutlet() ) ){
+                                        // Connection done ! :)
+                                    }
+                                    else {
+                                        ofLogNotice("Parameter") << "The inlet param " << this->getUID() << " (me) did not accept a connection with "<< outletParmName << ". Matbye it doesn't accept my data type ?" << std::endl;
+                                    }
+                                } catch (...) {
+                                    ofLogNotice("Parameter") << "Could not parse outlet " << outletParmName << " as an outlet !" << std::endl;
+                                }
+                            }
+                        }
+                        else {
+                            ofLogNotice("Parameter") << "Could not parse " << outletParmName << " to a parameter !" << std::endl;
+                        }
+                    }
+                }
+                else {
+                    std::cout << "Cannot find an instance named: " << outletParmName << "." << std::endl;
+                }
+                std::cout << "Dropped target on source(outlet)=" << outletParmName << " --> target(inlet)=" << this->getUID() << std::endl;
+            } // end VPPARAM_OUTLET_TO_INLET
+
+            // Handle dropping a parameter connection request
+            else if ( ENABLE_OUTLET ){
+                if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VPPARAM_INLET_TO_OUTLET")){
+                    //IM_ASSERT(payload->DataSize == sizeof(ofxVPHasUID::stringKeyType::value_type*));
+                    ofxVPHasUID::stringKeyType inletParmName = static_cast<ofxVPHasUID::stringKeyType::value_type*>(payload->Data);//static_cast<std::string*>((*data));
+
+                    // try to connect
+                    if( ofxVPHasUID* inletHasUID = ofxVPHasUID::getInstanceByUID(inletParmName) ){
+                        // Don't connect with self !
+                        if( static_cast<ofxVPHasUID*>(this) == inletHasUID ){
+                            ofLogNotice("Parameter") << "Notice: Not connecting the parameter with itself !" << std::endl;
+                        }
+                        else {
+                            // try to parse it as a parameter
+                            if( AbstractParameter* inletAbstract = dynamic_cast<AbstractParameter*>(inletHasUID)){
+                                try {
+                                    if( inletAbstract->getAsHasModifier().connectWithOutlet( this->getAsOutlet() ) ){
+                                        // Connection done ! :)
+                                    }
+                                    else {
+                                        ofLogNotice("Parameter") << "The param inlet " << inletParmName << " did not accept a connection with me. Matbye it doesn't accept my data type ?" << std::endl;
+                                    }
+                                } catch (...) {
+                                    ofLogNotice("Parameter") << "The param outlet " << this->getUID() << "(me) is not parsable as an outlet !" << std::endl;
+                                }
+                            }
+                            else {
+                                ofLogNotice("Parameter") << "Could not parse " << inletParmName << " to a parameter !" << std::endl;
+                            }
+                        }
+                    }
+                    else {
+                        std::cout << "Cannot find an instance named :" << inletParmName << "." << std::endl;
+                    }
+                    std::cout << "Dropped target on source(outlet)=" << this->getUID() << " --> target(inlet)=" << inletParmName << std::endl;
+                }
+            } // end VPPARAM_INLET_TO_OUTLET
+
+            ImGui::EndDragDropTarget();
+        }
+    };
+    void ImGuiDrawParamConnector(const bool& _drawInlet=false) const {
+        // Show source connect handle
+        if( ENABLE_OUTLET ){ //this->hasOutlet() ){
+            if(!_drawInlet) ImGui::SameLine();
+            ImGui::Button(_drawInlet?"<--":"-->");
+            if( ImGui::BeginDragDropSource(ImGuiDragDropFlags_None) ){
+                //ImGui::SetDragDropPayload("TEST", ((std::string::value_type**) this->getUID().c_str() ), sizeof(std::string::value_type*), ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
+                const ofxVPHasUID::stringKeyType& UID = this->getUID();
+                ImGui::SetDragDropPayload(_drawInlet?"VPPARAM_INLET_TO_OUTLET":"VPPARAM_OUTLET_TO_INLET", UID.data(), UID.size()+1, ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
+                ImGui::Text(_drawInlet?"Connect %s (inlet) with an outlet...":"Connect %s (outlet) with an inlet...", UID.c_str());
+                ImGui::EndDragDropSource();
+            }
+            if(_drawInlet) ImGui::SameLine();
+        }
+    }
+
+    // tmp method ?
+    void ImGuiShowInfoMenu(){
+        if( ImGui::IsMouseDoubleClicked(0) && ImGui::IsItemHovered() ) {
+            isMenuOpen = !isMenuOpen;
+        }
+        if( isMenuOpen ){
+            this->ImGuiPrintParameterInfo();
+        }
+    }
+
+    void ImGuiPrintParameterInfo(){
+        ImGui::TextUnformatted( this->getUID().c_str() );
+
+        ImGui::LabelText("HasOutlet", "%s", this->hasOutlet()?"1":"0" );
+        ImGui::LabelText("Modifiers", "%i", this->getNumModifiers() );
+        try {
+            if( this->template hasModifier< ParamInletModifier< DATA_TYPE > >() ){
+                ParamInletModifier< DATA_TYPE >& paramInlet = const_cast< Parameter<DATA_TYPE,ENABLE_OUTLET>& >( *this ).template getOrCreateModifier< ParamInletModifier<DATA_TYPE> >();
+                ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"1":"0" );
+            }
+            else {
+                 ImGui::LabelText( "InletModifier", "%s", "None" );
+            }
+        } catch(...) {
+            ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
+        }
+        ImGui::Separator();
+        std::ostringstream storedValue;     std::ostringstream outputValue;     std::ostringstream baseValue;
+        storedValue << this->dataValue;     outputValue << this->getValue();    baseValue << this->getBaseValue();
+        ImGui::LabelText("storedValue", "%s",   storedValue.str().c_str() );
+        ImGui::LabelText("baseValue", "%s",     baseValue.str().c_str());
+        ImGui::LabelText("outputValue", "%s",   outputValue.str().c_str() );
+    }
+
+public:// private:
     DATA_TYPE dataValue; // base value
     DATA_TYPE storedValue; // for save/load
+private:
+     bool isMenuOpen = false;
 };
 
 
@@ -669,7 +797,7 @@ public:
         // Trigger events
         myLink.fromPin->onPinConnected();
 
-        std::cout << "Modifier<T>::connectWithOutlet() succeeded ! " << myLink.fromPin->linkType << " --> " << myLink.toPin.linkType << std::endl;
+        //std::cout << "Modifier<T>::connectWithOutlet() succeeded ! " << myLink.fromPin->linkType << " --> " << myLink.toPin.linkType << std::endl;
         return true;
     };
     virtual bool disconnectPin() override { // maybe : return void, always succeed to disconnect ?

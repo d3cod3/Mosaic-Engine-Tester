@@ -32,7 +32,7 @@ public:
 //# endif
     }
 
-    ~ofxVPHasUID(){
+    virtual ~ofxVPHasUID(){
         // Any instance that gets properly deleted will automaticlly un-register
         if(allUIDs.find(this)!=allUIDs.end()){
             allUIDs.erase(this);
@@ -107,9 +107,22 @@ public:
         return (it == allUIDs.end());
     }
 
+    static ofxVPHasUID* getInstanceByUID(const stringKeyType& _key) {
+        for (auto it = allUIDs.begin(); it != allUIDs.end(); ++it){
+            if (it->second == _key){
+                return it->first;
+            }
+        }
+        return nullptr;
+    };
+
+    static const std::map<ofxVPHasUID*, stringKeyType>& getAllUIDs(){
+        return allUIDs;
+    }
 
 protected:
     stringKeyType myUID;
     const stringKeyType displayName;
+private:
     static std::map<ofxVPHasUID*, stringKeyType> allUIDs; // todo : invert key/value ?
 };

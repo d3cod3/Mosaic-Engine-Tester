@@ -25,74 +25,68 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e){
     return _out;
 }
 
-// Inline utility
-template<class FULLTYPE, typename DATATYPE>
-inline void ImGuiShowParamInfoOnRightClick(const FULLTYPE& _param){
-    // Show unique ID when clicking on the label (tmp?)
-    if(ImGui::IsMouseDown(0) && !ImGui::IsItemActive() && ImGui::IsItemHovered() && ImGui::IsWindowFocused() && 0 == ImGui::GetMouseDragDelta(0).x){
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        ImGui::TextUnformatted( _param.getUID().c_str() );
-
-        ImGui::LabelText("HasOutlet", "%s", _param.hasOutlet()?"1":"0" );
-        ImGui::LabelText("Modifiers", "%i", _param.getNumModifiers() );
-        try {
-            if( _param.template hasModifier< ParamInletModifier< DATATYPE > >() ){
-                ParamInletModifier< DATATYPE >& paramInlet = const_cast<FULLTYPE&>( _param ).template getOrCreateModifier< ParamInletModifier< DATATYPE > >();
-                ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"1":"0" );
-            }
-            else {
-                 ImGui::LabelText( "InletModifier", "%s", "None" );
-            }
-        } catch(...) {
-            ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
-        }
-        ImGui::Separator();
-        std::ostringstream storedValue;     std::ostringstream outputValue;     std::ostringstream baseValue;
-        storedValue << _param.dataValue;    outputValue << _param.getValue();   baseValue << _param.getBaseValue();
-        ImGui::LabelText("storedValue", "%s",   storedValue.str().c_str() );
-        ImGui::LabelText("baseValue", "%s",     baseValue.str().c_str());
-        ImGui::LabelText("outputValue", "%s",   outputValue.str().c_str() );
-
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-
-};
-
 // TYPE some parameters
 template<>
-void Parameter<int>::drawImGui() const {
+void Parameter<int>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
+
+    // inlet connector
+    ImGuiDrawParamConnector(true);
+
     // todo: remove const_cast somehow ?
     ImGui::DragInt(this->getDisplayName().c_str(), const_cast<int*>(&this->getValue()) );
-    ImGuiShowParamInfoOnRightClick< Parameter<int>, int >(*this);
+
+    // listen for GUI connections
+    ImGuiListenForParamDrop();
+
+    // tmp, menu
+    ImGuiShowInfoMenu();
+
+    // outlet connector
+    ImGuiDrawParamConnector();
+
     ImGui::PopID();
 };
+
 template<>
-void Parameter<float>::drawImGui() const {
+void Parameter<float>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
-    // todo: remove const_cast somehow ?
+
+    // inlet connector
+    ImGuiDrawParamConnector(true);
+
+    // todo: remove const_cast somehow ? (undefined c++ behaviour)
     ImGui::DragFloat(this->getDisplayName().c_str(), const_cast<float*>(&this->getValue()) );//const_cast<float*>(&this->getValue()) );
 
-    // tmp: show variable's address
-    if( ImGui::IsItemHovered() && ImGui::IsMouseDown(1) ) {
-        std::cout << "Parameter<float> " << this->getUID() <<
-        " [value]=" << &this->getValue() <<
-        " [base]=" << &this->getBaseValue() <<
-        " [modifiers]=" << this->paramModifiers.size() <<
-        //" [transformed]" << &this->paramModifiers.back()->transformValue( this->getBaseValue() ) <<
-        std::endl;
-    }
+    // listen for GUI connections
+    ImGuiListenForParamDrop();
 
-    ImGuiShowParamInfoOnRightClick< Parameter<float>, float >(*this);
+    // tmp, menu
+    ImGuiShowInfoMenu();
+
+    // outlet connector
+    ImGuiDrawParamConnector();
+
     ImGui::PopID();
 };
 template<>
-void Parameter<std::string>::drawImGui() const {
+void Parameter<std::string>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
+
+    // inlet connector
+    ImGuiDrawParamConnector(true);
+
     // todo: remove const_cast somehow ?
     ImGui::InputText(this->getDisplayName().c_str(), static_cast<std::string *>( const_cast<std::string*>(&this->getValue() )));
-    ImGuiShowParamInfoOnRightClick< Parameter<std::string>, std::string >(*this);
+
+    // listen for GUI connections
+    ImGuiListenForParamDrop();
+
+    // tmp, menu
+    ImGuiShowInfoMenu();
+
+    // outlet connector
+    ImGuiDrawParamConnector();
+
     ImGui::PopID();
 };
