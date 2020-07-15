@@ -109,6 +109,31 @@ inline std::string getLinkName() {
 };
 
 // - - - - - - - - - -
+enum OFXVP_MODIFIER_ {
+    OFXVP_MODIFIER_UNKNOWN = 0,
+    OFXVP_MODIFIER_INLET = 1,
+    OFXVP_MODIFIER_SCRIPTING = 2,
+    OFXVP_MODIFIER_TYPE_CONVERTOR = 3,
+};
+
+inline std::string getModifierName(const OFXVP_MODIFIER_& _modifier) {
+    switch (_modifier) {
+        case OFXVP_MODIFIER_INLET :
+            return "OFXVP_MODIFIER_INLET";
+            break;
+        case OFXVP_MODIFIER_SCRIPTING:
+            return "OFXVP_MODIFIER_SCRIPTING";
+            break;
+        case OFXVP_MODIFIER_TYPE_CONVERTOR:
+            return "OFXVP_MODIFIER_TYPE_CONVERTOR";
+            break;
+        default:
+            break;
+    }
+    return "OFXVP_MODIFIER_UNKNOWN";
+};
+
+// - - - - - - - - - -
 // To move to an included file ?
 enum VPErrorCode_ {
     VPErrorCode_UNDEFINED = 0,
@@ -147,8 +172,7 @@ public:
     bool isConnected = false;
     //bool isEnabled; // needed ??
     AbstractHasOutlet* fromPin = nullptr;
-    const AbstractHasInlet& toPin;
-
+    AbstractHasInlet& toPin;
 };
 
 // - - - - - - - - - -
@@ -331,7 +355,7 @@ public:
         return connectedPinLinks.size();
     };
 
-    virtual bool registerPinLink(PinLink<OUTPUT_TYPE>& _link){
+    bool registerPinLink(PinLink<OUTPUT_TYPE>& _link){
         // check
         if( (AbstractHasOutlet*) _link.fromPin == (AbstractHasOutlet*) this ){
             // todo: verify correct link type ?
@@ -345,7 +369,7 @@ public:
         return false;
     };
 
-    virtual bool unRegisterPinLink(PinLink<OUTPUT_TYPE>& _link){
+    bool unRegisterPinLink(PinLink<OUTPUT_TYPE>& _link){
         // check
         if( (AbstractHasOutlet*) _link.fromPin == (AbstractHasOutlet*) this ){
             // todo: verify correct link type ?
@@ -359,14 +383,13 @@ public:
         return false;
     };
 
-    virtual const AbstractPinLink& tryGetPinLink(const int& _index) override {
+    virtual AbstractPinLink& tryGetPinLink(const int& _index) override {
         if( connectedPinLinks.size() > _index ){
             int i = 0;
             for(auto it=connectedPinLinks.cbegin(); it!=connectedPinLinks.cend(); it++){
                 if(i==_index){
                     PinLink<OUTPUT_TYPE>*const ret = *it;
-                    //AbstractPinLink& rett = *it;
-                    return static_cast<const AbstractPinLink&>(**it);
+                    return **it;// static_cast<const AbstractPinLink&>(**it);
                 }
                 i++;
             }
@@ -376,18 +399,15 @@ public:
         throw VPError(VPErrorCode_LINK, VPErrorStatus_NOTICE, "This index doesn't exist in the connected links list.");
     };
 
+    virtual void onPinConnected() override {
+
+    };
     virtual void onPinDisconnected() override {
 
     };
 
 private:
     std::list< PinLink<OUTPUT_TYPE>* > connectedPinLinks; // only references, not owned
-};
-
-enum OFXVP_MODIFIER_ {
-    OFXVP_MODIFIER_UNKNOWN = 0,
-    OFXVP_MODIFIER_INLET = 1,
-    OFXVP_MODIFIER_SCRIPTING = 2
 };
 
 class abstractParamModifier {
@@ -439,15 +459,13 @@ public:
         // Ensure correct usage by allowing only deriveds of abstractParamModifier
         static_assert(std::is_base_of<abstractParamModifier, MODIFIER_TYPE>::value, "MODIFIER_TYPE should inherit from abstractParamModifier* !!!");
 
-        //if( std::is_base_of<ParamInletModifier, MODIFIER_TYPE>::value ){
-            for(abstractParamModifier* apm : abstractParamModifiers){
-                if( apm->modifierType == MODIFIER_TYPE::modifierType ){
-                    return true;
-                    break;
-                }
+        for(abstractParamModifier* apm : abstractParamModifiers){
+            if( apm->modifierType == MODIFIER_TYPE::modifierType ){
+                return true;
+                break;
             }
-            return false;
-        //}
+        }
+        return false;
     };
 
     int getNumModifiers() const {
@@ -789,8 +807,11 @@ protected:
     }
 
     void ImGuiPrintParameterInfo(){
+        // Name
         ImGui::TextUnformatted( this->getUID().c_str() );
         ImGui::Separator();
+
+        // Outlet info
         if( this->hasOutlet() ){
             try {
                 HasOutlet<DATA_TYPE>& outlet = *this;//->getAsOutlet();
@@ -798,8 +819,12 @@ protected:
                 ImGui::Text("Connected outlets : %i", outlet.getNumConnections() );
                 for(int i=0; i < outlet.getNumConnections(); i++){
                     try {
-                        const AbstractPinLink& pl = outlet.tryGetPinLink(i);
+                        AbstractPinLink& pl = outlet.tryGetPinLink(i);
                         ImGui::Text("Outlet %i --> %s", i, pl.toPin.getPinName().c_str() );
+                        ImGui::SameLine();
+                        if( ImGui::SmallButton("Disconnect") ){
+                            pl.toPin.disconnectPin();
+                        }
                     }
                     catch(...){
                         ImGui::Text("Inlet %i", i);
@@ -810,18 +835,27 @@ protected:
             }
         }
         else {
-            ImGui::Text("No Outlet on this param" );
+            ImGui::Text("No Outlet on this param..." );
         }
-
         ImGui::Separator();
+
+        // Modifiers info
         ImGui::Text("Modifiers information" );
         ImGui::LabelText("Num Modifiers", "%i", this->getNumModifiers() );
         try {
             if( this->template hasModifier< ParamInletModifier< DATA_TYPE > >() ){
                 ParamInletModifier< DATA_TYPE >& paramInlet = const_cast< Parameter<DATA_TYPE,ENABLE_OUTLET>& >( *this ).template getOrCreateModifier< ParamInletModifier<DATA_TYPE> >();
                 ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"yes":"no" );
+
+                if(paramInlet.myLink.isConnected ){
+                    ImGui::SameLine();
+                    if( ImGui::SmallButton("Disconnect") ){
+                        paramInlet.disconnectPin();
+                    }
+                }
+
                 for(ParamModifier<DATA_TYPE>* modifier : paramModifiers){
-                    //ImGui::Text("ModifierType: %i", modifier->modifierType);
+                    ImGui::Text("ModifierType: %s", getModifierName( modifier->modifierType ).c_str() );
                 }
             }
             else {
@@ -830,6 +864,8 @@ protected:
         } catch(...) {
             ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
         }
+
+        // Value information
         ImGui::Separator();
         std::ostringstream storedValue;     std::ostringstream outputValue;     std::ostringstream baseValue;
         storedValue << this->dataValue;     outputValue << this->getValue();    baseValue << this->getBaseValue();
@@ -897,7 +933,10 @@ public:
         }
 
         // Disconnect (if connected)
-        if(!disconnectPin()) return false;
+        if(!disconnectPin()){
+            ofLogVerbose("ParamInletModifier") << "Could not disconnect current connected pin. (probably weird behaviour)";
+            return false;
+        }
 
         // Connect
         try {
@@ -940,11 +979,10 @@ public:
                 myLink.fromPin->onPinDisconnected();
                 // notify self
                 this->onPinDisconnected(); // myLink.toPin.onPinDisconnected();
-
-                myLink.fromPin = nullptr;
-                myLink.fromPinTyped = nullptr;
             }
-
+            // disconnect
+            myLink.fromPin = nullptr;
+            myLink.fromPinTyped = nullptr;
             myLink.isConnected = false;
 
             return true;
