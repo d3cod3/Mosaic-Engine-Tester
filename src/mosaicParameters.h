@@ -327,6 +327,7 @@ protected:
 
     }
 public:
+    virtual bool isEditable() const = 0;
     const AbstractHasModifier& parent;
     const enum OFXVP_MODIFIER_ modifierType;// = OFXVP_MODIFIER_UNKNOWN;
 };
@@ -520,6 +521,12 @@ public:
             ImGui::LabelText( this->getDisplayName().c_str(), "%s (unable to display)", typeid(*this).name() );
         }
     };
+    bool isImGuiEditable() { // to be virtual ?
+        if( paramModifiers.size() > 0 ){
+            return this->paramModifiers.back()->isEditable();
+        }
+        return true;
+    };
     virtual AbstractHasModifier& getAsHasModifier() override {
         return *this;
     };
@@ -707,12 +714,28 @@ protected:
     void ImGuiPrintParameterInfo(){
         ImGui::TextUnformatted( this->getUID().c_str() );
 
-        ImGui::LabelText("HasOutlet", "%s", this->hasOutlet()?"1":"0" );
-        ImGui::LabelText("Modifiers", "%i", this->getNumModifiers() );
+        if( this->hasOutlet() ){
+            try {
+                HasOutlet<DATA_TYPE>& outlet = *this;//->getAsOutlet();
+                ImGui::Text("Outlet information" );
+                //ImGui::Text("Connected Inlets : %s", outlet );
+            } catch(...) {
+                ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
+            }
+        }
+        else {
+            ImGui::Text("No Outlet on this param" );
+        }
+
+        ImGui::Text("Modifiers information" );
+        ImGui::LabelText("Num Modifiers", "%i", this->getNumModifiers() );
         try {
             if( this->template hasModifier< ParamInletModifier< DATA_TYPE > >() ){
                 ParamInletModifier< DATA_TYPE >& paramInlet = const_cast< Parameter<DATA_TYPE,ENABLE_OUTLET>& >( *this ).template getOrCreateModifier< ParamInletModifier<DATA_TYPE> >();
-                ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"1":"0" );
+                ImGui::LabelText( "InletModifier", "Connected: %s", paramInlet.myLink.isConnected?"yes":"no" );
+                for(ParamModifier<DATA_TYPE>* modifier : paramModifiers){
+                    //ImGui::Text("ModifierType: %i", modifier->modifierType);
+                }
             }
             else {
                  ImGui::LabelText( "InletModifier", "%s", "None" );
@@ -765,6 +788,10 @@ public:
 
         // Or leave the value untouched
         return _originalValue;
+    }
+
+    virtual bool isEditable() const override {
+        return !myLink.isConnected;
     }
 
     // - - - - - - - - - -

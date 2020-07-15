@@ -33,8 +33,16 @@ void Parameter<int>::drawImGui() {
     // inlet connector
     ImGuiDrawParamConnector(true);
 
+    if(!this->isImGuiEditable()){
+        //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+    }
     // todo: remove const_cast somehow ?
     ImGui::DragInt(this->getDisplayName().c_str(), const_cast<int*>(&this->getValue()) );
+    if(!this->isImGuiEditable()){
+        //ImGui::PopItemFlag(); // todo: same as above
+        ImGui::PopStyleVar();
+    }
 
     // listen for GUI connections
     ImGuiListenForParamDrop();
@@ -55,8 +63,16 @@ void Parameter<float>::drawImGui() {
     // inlet connector
     ImGuiDrawParamConnector(true);
 
+    if(!this->isImGuiEditable()){
+        //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+    }
     // todo: remove const_cast somehow ? (undefined c++ behaviour)
     ImGui::DragFloat(this->getDisplayName().c_str(), const_cast<float*>(&this->getValue()) );//const_cast<float*>(&this->getValue()) );
+    if(!this->isImGuiEditable()){
+        //ImGui::PopItemFlag(); // todo: same as above
+        ImGui::PopStyleVar();
+    }
 
     // listen for GUI connections
     ImGuiListenForParamDrop();
@@ -76,8 +92,16 @@ void Parameter<std::string>::drawImGui() {
     // inlet connector
     ImGuiDrawParamConnector(true);
 
+    if(!this->isImGuiEditable()){
+        //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+    }
     // todo: remove const_cast somehow ?
     ImGui::InputText(this->getDisplayName().c_str(), static_cast<std::string *>( const_cast<std::string*>(&this->getValue() )));
+    if(!this->isImGuiEditable()){
+        //ImGui::PopItemFlag(); // todo: same as above
+        ImGui::PopStyleVar();
+    }
 
     // listen for GUI connections
     ImGuiListenForParamDrop();
