@@ -400,10 +400,10 @@ public:
     };
 
     virtual void onPinConnected() override {
-
+        //std::cout << "HasOutlet::onPinConnected();"<< std::endl;
     };
     virtual void onPinDisconnected() override {
-
+        //std::cout << "HasOutlet::onPinDisconnected();"<< std::endl;
     };
 
 private:
@@ -565,8 +565,8 @@ public:
     // From HasOutlet
     virtual typename std::enable_if<ENABLE_OUTLET>::type
     visualiseData() override {};
-    virtual void onPinConnected() override {};
-    virtual void onPinDisconnected() override {};
+    //virtual void onPinConnected() override {};
+    //virtual void onPinDisconnected() override {};
     //virtual void triggerValueChanged() override {};
 //    if ( ENABLE_OUTLET ) {
 //        return true;
@@ -963,7 +963,7 @@ public:
         myLink.isConnected = true;
 
         // Trigger events
-        myLink.fromPin->onPinConnected();
+        myLink.fromPinTyped->onPinConnected();
         this->onPinConnected(); // myLink.toPin.onPinConnected();
 
         //std::cout << "Modifier<T>::connectWithOutlet() succeeded ! " << myLink.fromPin->linkType << " --> " << myLink.toPin.linkType << std::endl;
@@ -991,8 +991,11 @@ public:
     }
     virtual void onPinConnected() override {
         // todo
+        //std::cout << "ParamInletModifier::onPinConnected();"<< std::endl;
     };
-    virtual void onPinDisconnected() override {};
+    virtual void onPinDisconnected() override {
+        //std::cout << "ParamInletModifier::onPinDisconnected();"<< std::endl;
+    };
     virtual void triggerValueChanged() override {};
     virtual const std::string& getPinName() const override {
         return this->parent.getHasModifierName();
