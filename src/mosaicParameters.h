@@ -148,6 +148,7 @@ public:
     //bool isEnabled; // needed ??
     AbstractHasOutlet* fromPin = nullptr;
     const AbstractHasInlet& toPin;
+
 };
 
 // - - - - - - - - - -
@@ -215,6 +216,8 @@ public:
     virtual void onPinConnected()=0; // todo : add the link as argument here ?
     virtual void onPinDisconnected()=0; // todo : add the link as argument here ?
 
+    virtual const std::string& getPinName() const = 0;
+
     ImVec2 pinPosition;
     const LinkType linkType;
     //ofxVPHasUID::stringKeyType owningObjectID; // needed ?
@@ -231,13 +234,13 @@ class AbstractHasInlet;
 template<typename T>
 class PinLink : public AbstractPinLink {
 public:
-    PinLink( HasInlet<T>& _parent ) : AbstractPinLink( _parent ), toPin(_parent){
+    PinLink( HasInlet<T>& _parent ) : AbstractPinLink( _parent ), toPinTyped(_parent){
 
     };
     virtual ~PinLink(){};
 
-    HasOutlet<T>* fromPin = nullptr;
-    const HasInlet<T>& toPin;
+    HasOutlet<T>* fromPinTyped = nullptr;
+    const HasInlet<T>& toPinTyped;
 };
 
 
@@ -254,7 +257,8 @@ public:
     // Events
     virtual void onPinConnected() override = 0;
     virtual void onPinDisconnected() override = 0;
-    virtual void triggerValueChanged() = 0;
+    virtual void triggerValueChanged() = 0; // todo
+    //virtual const std::string& getPinName() const override = 0;
 
     std::shared_ptr<AbstractPinLink> connectedLink;
 };
@@ -266,6 +270,10 @@ public:
     virtual ~HasInlet(){
 
     };
+
+//    virtual const std::string& getPinName() const override {
+
+//    };
 };
 
 template<typename T> class ParamModifier;
@@ -283,14 +291,16 @@ public:
         try {
             MODIFIER_TYPE* typedOutlet = dynamic_cast<MODIFIER_TYPE*>(this);
             if( !typedOutlet || typedOutlet==nullptr ){
-                throw 888;
+                throw 888; // todo: throw VPError
             };
             return *typedOutlet;
         } catch (...) {
             std::cout << "Catched WRONG TYPE CONVERSION! (normal behaviour)" << std::endl;
-            throw 777;
+            throw 777; // todo: throw VPError
         }
     };
+
+    virtual const AbstractPinLink& tryGetPinLink(const int& _index) = 0;
 
     // todo
     //std::vector<AbstractPinLink*> pinLinks;
@@ -301,10 +311,13 @@ public:
     bool bFlagDataChanged;
 };
 
-template<typename ACCEPT_TYPE>
+template<typename OUTPUT_TYPE>
 class HasOutlet : public AbstractHasOutlet {
 public:
-    HasOutlet() : AbstractHasOutlet( getLinkType< ACCEPT_TYPE >() ) {};
+    HasOutlet() : AbstractHasOutlet( getLinkType< OUTPUT_TYPE >() ) {};
+    virtual ~HasOutlet() {
+        // todo: notify others
+    };
     // todo
     // store dataref ?
 //    HasOutlet<ACCEPT_TYPE>& getAsOutlet(){
@@ -312,7 +325,63 @@ public:
 //    };
 
     // todo: un-virtual this by assigning a constant reference to HasOutlet's data value (?)
-    virtual const ACCEPT_TYPE& getOutputValue() = 0;
+    virtual const OUTPUT_TYPE& getOutputValue() = 0;
+
+    virtual int getNumConnections(){
+        return connectedPinLinks.size();
+    };
+
+    virtual bool registerPinLink(PinLink<OUTPUT_TYPE>& _link){
+        // check
+        if( (AbstractHasOutlet*) _link.fromPin == (AbstractHasOutlet*) this ){
+            // todo: verify correct link type ?
+
+            // register
+            connectedPinLinks.push_back( &_link );
+
+            return true;
+        }
+
+        return false;
+    };
+
+    virtual bool unRegisterPinLink(PinLink<OUTPUT_TYPE>& _link){
+        // check
+        if( (AbstractHasOutlet*) _link.fromPin == (AbstractHasOutlet*) this ){
+            // todo: verify correct link type ?
+
+            // unregister
+            connectedPinLinks.remove( &_link );
+
+            return true;
+        }
+
+        return false;
+    };
+
+    virtual const AbstractPinLink& tryGetPinLink(const int& _index) override {
+        if( connectedPinLinks.size() > _index ){
+            int i = 0;
+            for(auto it=connectedPinLinks.cbegin(); it!=connectedPinLinks.cend(); it++){
+                if(i==_index){
+                    PinLink<OUTPUT_TYPE>*const ret = *it;
+                    //AbstractPinLink& rett = *it;
+                    return static_cast<const AbstractPinLink&>(**it);
+                }
+                i++;
+            }
+
+        }
+
+        throw VPError(VPErrorCode_LINK, VPErrorStatus_NOTICE, "This index doesn't exist in the connected links list.");
+    };
+
+    virtual void onPinDisconnected() override {
+
+    };
+
+private:
+    std::list< PinLink<OUTPUT_TYPE>* > connectedPinLinks; // only references, not owned
 };
 
 enum OFXVP_MODIFIER_ {
@@ -384,6 +453,8 @@ public:
     int getNumModifiers() const {
         return abstractParamModifiers.size();
     };
+
+    virtual const std::string& getHasModifierName() const = 0;
 
     // TYPED API METHODS
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) = 0; // to return bool or PinLink&  ?
@@ -530,6 +601,12 @@ public:
     virtual AbstractHasModifier& getAsHasModifier() override {
         return *this;
     };
+    virtual const std::string& getHasModifierName() const override {
+        return getDisplayName();
+    };
+    virtual const std::string& getPinName() const override {
+        return getDisplayName();
+    };
     virtual bool hasOutlet() const override final {
         return ENABLE_OUTLET;
     };
@@ -626,7 +703,7 @@ protected:
                                         // Connection done ! :)
                                     }
                                     else {
-                                        ofLogNotice("Parameter") << "The inlet param " << this->getUID() << " (me) did not accept a connection with "<< outletParmName << ". Matbye it doesn't accept my data type ?" << std::endl;
+                                        ofLogNotice("Parameter") << "The inlet param " << this->getUID() << " (me) did not accept a connection with "<< outletParmName << ". Maybe it doesn't accept my data type ?" << std::endl;
                                     }
                                 } catch (...) {
                                     ofLogNotice("Parameter") << "Could not parse outlet " << outletParmName << " as an outlet !" << std::endl;
@@ -713,12 +790,21 @@ protected:
 
     void ImGuiPrintParameterInfo(){
         ImGui::TextUnformatted( this->getUID().c_str() );
-
+        ImGui::Separator();
         if( this->hasOutlet() ){
             try {
                 HasOutlet<DATA_TYPE>& outlet = *this;//->getAsOutlet();
                 ImGui::Text("Outlet information" );
-                //ImGui::Text("Connected Inlets : %s", outlet );
+                ImGui::Text("Connected outlets : %i", outlet.getNumConnections() );
+                for(int i=0; i < outlet.getNumConnections(); i++){
+                    try {
+                        const AbstractPinLink& pl = outlet.tryGetPinLink(i);
+                        ImGui::Text("Outlet %i --> %s", i, pl.toPin.getPinName().c_str() );
+                    }
+                    catch(...){
+                        ImGui::Text("Inlet %i", i);
+                    }
+                }
             } catch(...) {
                 ImGui::LabelText( "InletModifier", "%s", "Error/Unavailable" );
             }
@@ -727,6 +813,7 @@ protected:
             ImGui::Text("No Outlet on this param" );
         }
 
+        ImGui::Separator();
         ImGui::Text("Modifiers information" );
         ImGui::LabelText("Num Modifiers", "%i", this->getNumModifiers() );
         try {
@@ -776,14 +863,16 @@ public:
     ParamInletModifier( const AbstractHasModifier& _parent ) : ParamModifier<MODIFIER_TYPE>( _parent, OFXVP_MODIFIER_INLET /*getLinkName<MODIFIER_TYPE>() +" (Inlet)"*/), HasInlet<MODIFIER_TYPE>(), myLink(*this) {
 
     }
-    virtual ~ParamInletModifier(){};
+    virtual ~ParamInletModifier(){
+        disconnectPin();
+    };
 
     // Note: inline is needed so it can be defined once later in the code. Defining it here lead to duplicated symbols linker errors.
     // Todo : move it to .cpp file ?
     virtual const inline MODIFIER_TYPE& transformValue(const MODIFIER_TYPE& _originalValue) const override {
         //std::cout << "ParamModifier<T>::transformValue() UNTYPED !!!!" << std::endl;
         if( myLink.isConnected ){
-            return myLink.fromPin->getOutputValue();
+            return myLink.fromPinTyped->getOutputValue();
         }
 
         // Or leave the value untouched
@@ -812,10 +901,23 @@ public:
 
         // Connect
         try {
-            myLink.fromPin = &_outlet.getTypedOutlet< HasOutlet<MODIFIER_TYPE> >();
+            myLink.fromPinTyped = &_outlet.getTypedOutlet< HasOutlet<MODIFIER_TYPE> >();
+            myLink.fromPin = static_cast<AbstractHasOutlet*>(myLink.fromPinTyped);
         } catch(...){
+            myLink.isConnected = false;
+            myLink.fromPinTyped = nullptr;
+            myLink.fromPin = nullptr;
             std::cout << "Cannot get typed outlet, probably this is an uncompatible abstract, or it has no outlet." << std::endl;
             //disconnectPin();
+            return false;
+        }
+
+        // Register @ fromPin
+        if(!myLink.fromPinTyped->registerPinLink(myLink)){
+            ofLogNotice() << "ParamInletModifier " << this->getPinName() << " could not register @ parameter outlet " << myLink.fromPin->getPinName();
+            myLink.isConnected = false;
+            myLink.fromPinTyped = nullptr;
+            myLink.fromPin = nullptr;
             return false;
         }
 
@@ -823,16 +925,29 @@ public:
 
         // Trigger events
         myLink.fromPin->onPinConnected();
+        this->onPinConnected(); // myLink.toPin.onPinConnected();
 
         //std::cout << "Modifier<T>::connectWithOutlet() succeeded ! " << myLink.fromPin->linkType << " --> " << myLink.toPin.linkType << std::endl;
         return true;
     };
     virtual bool disconnectPin() override { // maybe : return void, always succeed to disconnect ?
         if(myLink.isConnected){
-            // notify outlet
-            myLink.fromPin->onPinDisconnected();
-            myLink.fromPin = nullptr;
+            // unregister
+            if(myLink.fromPin!=nullptr && myLink.fromPinTyped!=nullptr){
+                myLink.fromPinTyped->unRegisterPinLink(myLink);
+
+                // notify outlet
+                myLink.fromPin->onPinDisconnected();
+                // notify self
+                this->onPinDisconnected(); // myLink.toPin.onPinDisconnected();
+
+                myLink.fromPin = nullptr;
+                myLink.fromPinTyped = nullptr;
+            }
+
             myLink.isConnected = false;
+
+            return true;
         }
         return true;
     }
@@ -841,6 +956,9 @@ public:
     };
     virtual void onPinDisconnected() override {};
     virtual void triggerValueChanged() override {};
+    virtual const std::string& getPinName() const override {
+        return this->parent.getHasModifierName();
+    };
 
     // - - - - - - - - - -
     //mutable bool isConnected;

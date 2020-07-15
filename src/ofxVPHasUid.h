@@ -39,12 +39,12 @@ public:
         }
     }
 
-    stringKeyType getUID() const{
+    const stringKeyType& getUID() const{
         return myUID;
     }
 
     // "DisplayName" is the initially requested name, not guaranteed to be unique.
-    stringKeyType getDisplayName() const{
+    const stringKeyType& getDisplayName() const{
         return displayName;
     }
 
