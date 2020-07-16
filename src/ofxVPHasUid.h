@@ -48,6 +48,54 @@ public:
         return displayName;
     }
 
+    bool changeName(const std::string& _newDisplayName, const std::string& _newUID = ""){
+        // Got no changes to perform ?
+        if(_newDisplayName==this->displayName && _newUID==this->myUID){
+            return true;
+        }
+
+        // UID min length = 1 char
+        std::string newName = _newDisplayName;
+        if(_newDisplayName.size()<1){
+            newName = "UID";
+        }
+        std::string newUID = _newUID;
+        if(_newUID.length()==0) newUID=newName; // sets default value
+
+        // Ensure _newUID starts with displayName
+        for(std::string::size_type i = 0; i < newName.size(); ++i) {
+            if(newName[i] != newUID[i] ){
+                // Set uid to name + uid
+                newUID = newName + newUID;
+                break;
+            }
+        }
+        if(newUID != _newUID){
+            ofLogVerbose("ofxHasUID::changeName()") << "The desired UID " << _newUID << " had to be changed to " << newUID <<". (not sure this is a desired behaviour)";
+        }
+        // ensure it's unique
+        makeIdentifierUnique(newUID);
+
+        if(newUID != _newUID){
+            ofLogVerbose("ofxHasUID::changeName()") << "The desired UID " << _newUID << " had to be changed to " << newUID <<" to prevent having duplicates.";
+        }
+
+        // update register
+        auto it = allUIDs.find(this);
+        if( it != allUIDs.end() ){
+            it->second = _newUID;
+
+            // Update names
+            this->displayName = newName;
+            this->myUID = newUID;
+
+            return true;
+        }
+
+        // failed to update register...
+        return false;
+    }
+
     static bool registerUniqueIdentifier(stringKeyType& _name, ofxVPHasUID* _instance) {
 
         if(_instance == nullptr){
@@ -78,8 +126,6 @@ public:
             newName += std::to_string(_inc);
         }
 
-        //std::cout << "Searching for : " << newName << std::endl;
-
         // recurse until name is unique
         if( !isIdentifierUnique(newName) ){
             //std::cout << "Recursing !" << std::endl;
@@ -87,7 +133,6 @@ public:
             return;
         }
 
-        //std::cout << "Got UNIQUE ! : " << newName << std::endl;
         _name = newName;
 
 //        for(auto it=allUIDs.begin(); it!=allUIDs.end(); ++it){
@@ -120,9 +165,8 @@ public:
         return allUIDs;
     }
 
-protected:
-    stringKeyType myUID;
-    const stringKeyType displayName;
 private:
     static std::map<ofxVPHasUID*, stringKeyType> allUIDs; // todo : invert key/value ?
+    stringKeyType myUID;
+    stringKeyType displayName;
 };

@@ -1,4 +1,5 @@
 #include "mosaicParameters.h"
+#include<string>
 
 // Initialise static members
 std::vector<AbstractParameter*> AbstractParameter::allParams = std::vector<AbstractParameter*>();
@@ -25,7 +26,10 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e){
     return _out;
 }
 
+// - - - - - - - - - -
 // TYPE some parameters
+// - - - - - - - - - -
+// INT SPACIALISATIONS
 template<>
 void Parameter<int>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
@@ -55,7 +59,18 @@ void Parameter<int>::drawImGui() {
 
     ImGui::PopID();
 };
-
+template<>
+std::string Parameter<int>::serialize(const bool& _serializeStoredValue) const {
+    return std::to_string( _serializeStoredValue ? this->storedValue : this->dataValue );
+};
+template<>
+bool Parameter<int>::unserialize( const std::string& _value, const bool& _unserializeToStoredValue ) {
+    if(_unserializeToStoredValue) this->storedValue = std::stoi(_value);
+    this->dataValue = std::stoi(_value);
+    return true;
+};
+// - - - - - - - - - -
+// FLOAT SPACIALISATIONS
 template<>
 void Parameter<float>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
@@ -86,6 +101,21 @@ void Parameter<float>::drawImGui() {
     ImGui::PopID();
 };
 template<>
+std::string Parameter<float>::serialize(const bool& _serializeStoredValue) const {
+    return std::to_string( _serializeStoredValue ? this->storedValue : this->dataValue );
+};
+template<>
+bool Parameter<float>::unserialize( const std::string& _value, const bool& _unserializeToStoredValue ) {
+    if(_unserializeToStoredValue) this->storedValue = std::stof(_value);
+    this->dataValue = std::stof(_value);
+
+    // todo: bflagDataChanged
+
+    return true;
+};
+// - - - - - - - - - -
+// STRING SPACIALISATIONS
+template<>
 void Parameter<std::string>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
 
@@ -113,4 +143,14 @@ void Parameter<std::string>::drawImGui() {
     ImGuiDrawParamConnector();
 
     ImGui::PopID();
+};
+template<>
+std::string Parameter<std::string>::serialize(const bool& _serializeStoredValue) const {
+    return _serializeStoredValue ? this->storedValue : this->dataValue;
+};
+template<>
+bool Parameter<std::string>::unserialize( const std::string& _value, const bool& _unserializeToStoredValue ) {
+    if(_unserializeToStoredValue) this->storedValue = _value;
+    else this->dataValue = _value;
+    return true;
 };

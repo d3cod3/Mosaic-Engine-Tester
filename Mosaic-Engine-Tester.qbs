@@ -26,7 +26,8 @@ Project{
         ]
 
         of.addons: [
-            'ofxImGui'
+            'ofxImGui',
+            'ofxXmlSettings',
         ]
 
         // additional flags for the project. the of module sets some

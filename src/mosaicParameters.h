@@ -51,6 +51,7 @@
 
 #include "ofxVPHasUid.h"
 #include "imgui_stdlib.h"
+#include "ofxXmlSettings.h"
 
 // - - - - - - - - - -
 
@@ -199,10 +200,10 @@ public:
     };
 
     // API methods
-    virtual bool saveToXML() const = 0;
-    virtual bool loadFromXML() = 0;
-    virtual std::string serialize() = 0;
-    virtual bool unserialize() = 0;
+    virtual bool saveToXML(ofxXmlSettings& _xml) const = 0;
+    virtual bool loadFromXML(ofxXmlSettings& _xml) = 0;
+    virtual std::string serialize(const bool& _serializeStoredValue=false) const = 0;
+    virtual bool unserialize( const std::string& _value, const bool& _unserializeToStoredValue=false ) = 0;
     //virtual void update() = 0; // needed ?
     virtual void drawImGuiEditable() = 0;
     virtual void drawImGui() = 0; // needed ?
@@ -211,11 +212,6 @@ public:
     virtual bool hasOutlet() const = 0;
     virtual AbstractHasOutlet& getAsOutlet() = 0;
     //virtual void tmpTestFunc() = 0;
-
-    const bool& dataHasChanged() const {
-        return bFlagDataChanged;
-    }
-    bool bFlagDataChanged = false;
 
     // conversion
     AbstractParameter& getAsAbstract(){ return *this; };
@@ -332,7 +328,11 @@ public:
     //const std::string dataLabel;
     //const LinkType linkType;
     virtual void visualiseData() = 0;
-    bool bFlagDataChanged;
+    const bool& dataHasChanged() const {
+        return bFlagDataChanged;
+    }
+protected:
+    bool bFlagDataChanged = false;
 };
 
 template<typename OUTPUT_TYPE>
@@ -580,16 +580,51 @@ public:
     };
 
     // From AbstractParameter
-    bool saveToXML() const override {
-        return false; // todo
+    virtual bool saveToXML(ofxXmlSettings& _xml) const override {
+        if(_xml.pushTag("mosaicParam", _xml.addTag("mosaicParam") )){
+            //_xml.addValue("nodeType", nodeType );
+            _xml.addValue("UID", getUID() );
+            _xml.addValue("DisplayName", getDisplayName() );
+            _xml.addValue("StoredValue", storedValue );
+
+            _xml.popTag();
+        }
+
+        return true; // todo
     };
-    bool loadFromXML() override {
-        return false; // todo
+    // _xml.PushTag() must be inside the mosaicParam prior to calling this method
+    virtual bool loadFromXML(ofxXmlSettings& _xml) override {
+
+        // Set name
+        if(!this->changeName( _xml.getValue("DisplayName", getDisplayName()), _xml.getValue("UID", getUID()) )){
+            // todo: how to handle errored name changes ?
+            return false;
+        }
+        //displayName = _xml.getValue("DisplayName", getDisplayName() );
+        //myUID = _xml.getValue("UID", getUID() );
+
+        // load data
+        this->storedValue = _xml.getValue("StoredValue", storedValue );
+        this->dataValue = this->storedValue;
+        this->bFlagDataChanged = true;
+
+        return true;
     };
-    std::string serialize() override {
-        return ""; // todo
+    virtual std::string serialize(const bool& _serializeStoredValue=false) const override {
+        std::ostringstream serialized;
+        if(_serializeStoredValue) serialized << this->storedValue;
+        else serialized << this->dataValue;
+
+        if(serialized.tellp()>0){ // tellp = size()
+            return serialized.str();
+        }
+        // error ?
+        return "[unable-to-serialize]";
     };
-    bool unserialize() override {
+    virtual bool unserialize( const std::string& _value, const bool& _unserializeToStoredValue=false ) override {
+        //if(_unserializeToStoredValue) this->storedValue = _value;
+        //else this->dataValue = _value;
+
         return false; // todo
     };
     //void update() = 0; // needed ?
@@ -599,16 +634,9 @@ public:
     };
     void drawImGui() override {
         // Fallback behaviour for any type : Try to display without editing capabilities.
-        std::ostringstream serialized;
-        serialized << this->dataValue; // &this->dataValue; --> displays variable address
-        if(serialized.tellp()>0){ // tellp = size()
-            // Echo serialized value
-            ImGui::LabelText( this->getDisplayName().c_str(), "%s", serialized.str().c_str() );
-        }
-        else {
-            // echo variable type
-            ImGui::LabelText( this->getDisplayName().c_str(), "%s (unable to display)", typeid(*this).name() );
-        }
+        // Echo serialized value
+        ImGui::LabelText( this->getDisplayName().c_str(), "%s", this->serialize().c_str() );
+        //ImGui::LabelText( this->getDisplayName().c_str(), "%s (unable to display)", typeid(*this).name() );
     };
     bool isImGuiEditable() { // to be virtual ?
         if( paramModifiers.size() > 0 ){
@@ -808,7 +836,8 @@ protected:
 
     void ImGuiPrintParameterInfo(){
         // Name
-        ImGui::TextUnformatted( this->getUID().c_str() );
+        ImGui::Text( "UID: %s", this->getUID().c_str() );
+        ImGui::Text( "LinkType: %s", getLinkName<DATA_TYPE>().c_str() );
         ImGui::Separator();
 
         // Outlet info
