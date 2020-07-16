@@ -15,11 +15,11 @@ template<> LinkType getLinkType<char[]>() { return VP_LINK_STRING; };
 //template<> LinkType getLinkType<ofAudioBuffer>() { return VP_LINK_AUDIO; };
 //template<> LinkType getLinkType<ofPixels>() { return VP_LINK_PIXELS; };
 
-template<> std::string getLinkName<long double>() { return "VP_LINK_NUMERIC"; };
-template<> std::string getLinkName<float>() { return "VP_LINK_NUMERIC"; };
-template<> std::string getLinkName<int>() { return "VP_LINK_NUMERIC"; };
-template<> std::string getLinkName<std::string>() { return "VP_LINK_STRING"; };
-template<> std::string getLinkName<char[]>() { return "VP_LINK_STRING"; };
+template<> const char* getLinkName<long double>() { return "VP_LINK_NUMERIC"; };
+template<> const char* getLinkName<float>() { return "VP_LINK_NUMERIC"; };
+template<> const char* getLinkName<int>() { return "VP_LINK_NUMERIC"; };
+template<> const char* getLinkName<std::string>() { return "VP_LINK_STRING"; };
+template<> const char* getLinkName<char[]>() { return "VP_LINK_STRING"; };
 
 std::ostream& operator << (std::ostream& _out, const VPError& _e){
     _out << "VPError=[" << _e.code << "/" << _e.status << "] " << _e.message << std::endl;
@@ -34,16 +34,20 @@ template<>
 void Parameter<int>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
 
+    ImGui::AlignTextToFramePadding();
+
     // inlet connector
     ImGuiDrawParamConnector(true);
 
-    if(!this->isImGuiEditable()){
+    if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
+    //ImGui::SetNextItemWidth(-1); // sets item to take full witdh. Not rendered well for now.
     // todo: remove const_cast somehow ?
-    ImGui::DragInt(this->getDisplayName().c_str(), const_cast<int*>(&this->getValue()) );
-    if(!this->isImGuiEditable()){
+    ImGui::DragInt( this->getDisplayName().c_str(), const_cast<int*>(&this->getValue()) );
+
+    if(!this->getIsEditable()){
         //ImGui::PopItemFlag(); // todo: same as above
         ImGui::PopStyleVar();
     }
@@ -78,13 +82,13 @@ void Parameter<float>::drawImGui() {
     // inlet connector
     ImGuiDrawParamConnector(true);
 
-    if(!this->isImGuiEditable()){
+    if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     // todo: remove const_cast somehow ? (undefined c++ behaviour)
     ImGui::DragFloat(this->getDisplayName().c_str(), const_cast<float*>(&this->getValue()) );//const_cast<float*>(&this->getValue()) );
-    if(!this->isImGuiEditable()){
+    if(!this->getIsEditable()){
         //ImGui::PopItemFlag(); // todo: same as above
         ImGui::PopStyleVar();
     }
@@ -122,13 +126,13 @@ void Parameter<std::string>::drawImGui() {
     // inlet connector
     ImGuiDrawParamConnector(true);
 
-    if(!this->isImGuiEditable()){
+    if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     // todo: remove const_cast somehow ?
     ImGui::InputText(this->getDisplayName().c_str(), static_cast<std::string *>( const_cast<std::string*>(&this->getValue() )));
-    if(!this->isImGuiEditable()){
+    if(!this->getIsEditable()){
         //ImGui::PopItemFlag(); // todo: same as above
         ImGui::PopStyleVar();
     }

@@ -19,11 +19,9 @@
 
 // TODO // ROADMAP :
 
-// 1 - prepare a code base for implementing ofxVPParams logic
+// 2 - Enforce data types and link types.
 
-// 2 - implement the most simple connection/disconnection (number cables?, we'll do that starting implementing HasUID, ParamAbstract and Parameter classes)
-
-// 3 - implement all the other classes from the VPParams scheme you did, one by one
+// 3 - implement all the other classes from the VPParams scheme @Github#22
 
 // 4 - implement more complex connections
 
@@ -105,8 +103,11 @@ inline LinkType getLinkType() {
     return VP_LINK_UNDEFINED;
 };
 template<typename DATA_TYPE>
-inline std::string getLinkName() {
+inline const char* getLinkName() {
     return "VP_LINK_UNDEFINED";
+};
+inline const char* getLinkName(const LinkType& _linkType) {
+    return ToString(_linkType);
 };
 
 // - - - - - - - - - -
@@ -211,7 +212,9 @@ public:
     virtual AbstractHasModifier& getAsHasModifier() = 0;
     virtual bool hasOutlet() const = 0;
     virtual AbstractHasOutlet& getAsOutlet() = 0;
-    //virtual void tmpTestFunc() = 0;
+    virtual bool getIsEditable() const {
+        return isEditable;
+    };
 
     // conversion
     AbstractParameter& getAsAbstract(){ return *this; };
@@ -220,7 +223,8 @@ public:
     static const std::vector<AbstractParameter*>& getAllParams() { return allParams; };//const_cast< std::vector< AbstractParam* > >(allParams); };
 protected:
     static std::vector<AbstractParameter*> allParams;
-
+private:
+    bool isEditable = true;
 };
 
 // - - - - - - - - - -
@@ -236,7 +240,7 @@ public:
     virtual void onPinConnected()=0; // todo : add the link as argument here ?
     virtual void onPinDisconnected()=0; // todo : add the link as argument here ?
 
-    virtual const std::string& getPinName() const = 0;
+    virtual const std::string& getPinLabel() const = 0;
 
     ImVec2 pinPosition;
     const LinkType linkType;
@@ -278,7 +282,7 @@ public:
     virtual void onPinConnected() override = 0;
     virtual void onPinDisconnected() override = 0;
     virtual void triggerValueChanged() = 0; // todo
-    //virtual const std::string& getPinName() const override = 0;
+    //virtual const std::string& getPinLabel() const override = 0;
 
     std::shared_ptr<AbstractPinLink> connectedLink;
 };
@@ -291,7 +295,7 @@ public:
 
     };
 
-//    virtual const std::string& getPinName() const override {
+//    virtual const std::string& getPinLabel() const override {
 
 //    };
 };
@@ -622,8 +626,7 @@ public:
         return "[unable-to-serialize]";
     };
     virtual bool unserialize( const std::string& _value, const bool& _unserializeToStoredValue=false ) override {
-        //if(_unserializeToStoredValue) this->storedValue = _value;
-        //else this->dataValue = _value;
+        ofLogNotice("Parameter::unserialize()") << "Please implement this method in your parameter.";
 
         return false; // todo
     };
@@ -638,11 +641,11 @@ public:
         ImGui::LabelText( this->getDisplayName().c_str(), "%s", this->serialize().c_str() );
         //ImGui::LabelText( this->getDisplayName().c_str(), "%s (unable to display)", typeid(*this).name() );
     };
-    bool isImGuiEditable() { // to be virtual ?
-        if( paramModifiers.size() > 0 ){
+    virtual bool getIsEditable() const override {
+        if(  AbstractParameter::getIsEditable() && paramModifiers.size() > 0 ){
             return this->paramModifiers.back()->isEditable();
         }
-        return true;
+        return AbstractParameter::getIsEditable();
     };
     virtual AbstractHasModifier& getAsHasModifier() override {
         return *this;
@@ -650,8 +653,8 @@ public:
     virtual const std::string& getHasModifierName() const override {
         return getDisplayName();
     };
-    virtual const std::string& getPinName() const override {
-        return getDisplayName();
+    virtual const std::string& getPinLabel() const override {
+        return getDisplayName(); // or return UID ?
     };
     virtual bool hasOutlet() const override final {
         return ENABLE_OUTLET;
@@ -749,7 +752,7 @@ protected:
                                         // Connection done ! :)
                                     }
                                     else {
-                                        ofLogNotice("Parameter") << "The inlet param " << this->getUID() << " (me) did not accept a connection with "<< outletParmName << ". Maybe it doesn't accept my data type ?" << std::endl;
+                                        ofLogNotice("Parameter") << "The inlet param " << this->getUID() << " (me) did not accept a connection with "<< outletParmName << ". Maybe it doesn't accept my data type ?";
                                     }
                                 } catch (...) {
                                     ofLogNotice("Parameter") << "Could not parse outlet " << outletParmName << " as an outlet !" << std::endl;
@@ -837,7 +840,7 @@ protected:
     void ImGuiPrintParameterInfo(){
         // Name
         ImGui::Text( "UID: %s", this->getUID().c_str() );
-        ImGui::Text( "LinkType: %s", getLinkName<DATA_TYPE>().c_str() );
+        ImGui::Text( "LinkType: %s", getLinkName<DATA_TYPE>() );
         ImGui::Separator();
 
         // Outlet info
@@ -849,7 +852,7 @@ protected:
                 for(int i=0; i < outlet.getNumConnections(); i++){
                     try {
                         AbstractPinLink& pl = outlet.tryGetPinLink(i);
-                        ImGui::Text("Outlet %i --> %s", i, pl.toPin.getPinName().c_str() );
+                        ImGui::Text("Outlet %i = %s (%s)", i, pl.toPin.getPinLabel().c_str(), getLinkName(pl.toPin.linkType) );
                         ImGui::SameLine();
                         if( ImGui::SmallButton("Disconnect") ){
                             pl.toPin.disconnectPin();
@@ -871,6 +874,11 @@ protected:
         // Modifiers info
         ImGui::Text("Modifiers information" );
         ImGui::LabelText("Num Modifiers", "%i", this->getNumModifiers() );
+        for(ParamModifier<DATA_TYPE>* modifier : paramModifiers){
+            ImGui::Text("ModifierType: %s", getModifierName( modifier->modifierType ).c_str() );
+        }
+        ImGui::Separator();
+        // InletModifier info
         try {
             if( this->template hasModifier< ParamInletModifier< DATA_TYPE > >() ){
                 ParamInletModifier< DATA_TYPE >& paramInlet = const_cast< Parameter<DATA_TYPE,ENABLE_OUTLET>& >( *this ).template getOrCreateModifier< ParamInletModifier<DATA_TYPE> >();
@@ -881,10 +889,6 @@ protected:
                     if( ImGui::SmallButton("Disconnect") ){
                         paramInlet.disconnectPin();
                     }
-                }
-
-                for(ParamModifier<DATA_TYPE>* modifier : paramModifiers){
-                    ImGui::Text("ModifierType: %s", getModifierName( modifier->modifierType ).c_str() );
                 }
             }
             else {
@@ -957,7 +961,7 @@ public:
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {
         //std::cout << "Modifier<T>::connectWithOutlet() --> connecting parameter" << std::endl;
         if( !acceptsLinkType( _outlet.linkType ) ){
-            std::cout << "Modifier<T>::connectWithOutlet() --> incompatible link type !" << std::endl;
+            ofLogNotice("ParamInletModifierconnectWithOutlet()") << " --> incompatible link type ! (" << getLinkName<MODIFIER_TYPE>() << " <<  vs " << getLinkName(_outlet.linkType) << ")" << std::endl;
             return false;
         }
 
@@ -982,7 +986,7 @@ public:
 
         // Register @ fromPin
         if(!myLink.fromPinTyped->registerPinLink(myLink)){
-            ofLogNotice() << "ParamInletModifier " << this->getPinName() << " could not register @ parameter outlet " << myLink.fromPin->getPinName();
+            ofLogNotice() << "ParamInletModifier " << this->getPinLabel() << " could not register @ parameter outlet " << myLink.fromPin->getPinLabel();
             myLink.isConnected = false;
             myLink.fromPinTyped = nullptr;
             myLink.fromPin = nullptr;
@@ -1026,7 +1030,7 @@ public:
         //std::cout << "ParamInletModifier::onPinDisconnected();"<< std::endl;
     };
     virtual void triggerValueChanged() override {};
-    virtual const std::string& getPinName() const override {
+    virtual const std::string& getPinLabel() const override {
         return this->parent.getHasModifierName();
     };
 
