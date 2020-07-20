@@ -295,6 +295,9 @@ public:
 
     };
 
+    virtual bool acceptsOutletInstance( HasOutlet<ACCEPT_TYPE>& _outletInstance ) const = 0;
+
+
 //    virtual const std::string& getPinLabel() const override {
 
 //    };
@@ -411,6 +414,7 @@ public:
     };
 
 private:
+    // todo: this should probably be AbstractPinlink to allow easier type-compatibility
     std::list< PinLink<OUTPUT_TYPE>* > connectedPinLinks; // only references, not owned
 };
 
@@ -427,9 +431,10 @@ public:
 
 class AbstractHasModifier { // todo: rename to AbstractHasModifiers
 public:
+    AbstractHasModifier(const void* _underlyingValue) : underlyingValueAddr(_underlyingValue){};
     virtual ~AbstractHasModifier(){};
     //virtual bool addModifier() = 0;
-    const AbstractHasModifier& getAbstractModifier() {
+    const AbstractHasModifier& getAbstractHasModifier() {
         return static_cast<const AbstractHasModifier&>(*this);
     };
 
@@ -482,12 +487,15 @@ public:
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) = 0; // to return bool or PinLink&  ?
 
     std::list<abstractParamModifier*> abstractParamModifiers;
+    const void* underlyingValueAddr;
 };
 
 template<typename ACCEPT_TYPE>
 class HasModifier : public AbstractHasModifier {
 public:
-    //HasModifier() : AbstractHasModifier() {};
+    HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( &_underlyingValue ) {
+
+    };
     virtual ~HasModifier(){
         for(ParamModifier<ACCEPT_TYPE>* modifier : paramModifiers){
             delete modifier;
@@ -497,7 +505,7 @@ public:
     };
     virtual bool addModifier() /*override*/ { // todo : return bool ?
         // tmp, only inletmodifiers
-        const AbstractHasModifier& tmp = this->getAbstractModifier();
+        const AbstractHasModifier& tmp = this->getAbstractHasModifier();
         paramModifiers.push_back( new ParamInletModifier<ACCEPT_TYPE>( tmp ) );
         abstractParamModifiers.push_back( paramModifiers.back() ); // always keep abstracts synced
         return true;
@@ -536,7 +544,7 @@ public:
         }
 
         // nothing found ? Create new modifier
-        auto* newModifierInstance = new MODIFIER_TYPE( *this );
+        MODIFIER_TYPE* newModifierInstance = new MODIFIER_TYPE( *this );
         paramModifiers.push_back( newModifierInstance );
         abstractParamModifiers.push_back( newModifierInstance );
         //std::cout << "Created a brand new modifier !" << std::endl;
@@ -544,7 +552,7 @@ public:
     };
 
 protected:
-    std::list<ParamModifier<ACCEPT_TYPE>*> paramModifiers; // stores ptr but owns them. Be sure to clean memory!
+    std::list<ParamModifier<ACCEPT_TYPE>*> paramModifiers; // stores ptr but owns them. Be sure to clean memory! Mirrored in AbstractHasModifiers::abstractParamModifiers
 };
 
 template<typename DATA_TYPE, bool ENABLE_OUTLET=true>
@@ -552,7 +560,7 @@ template<typename DATA_TYPE, bool ENABLE_OUTLET=true>
 class Parameter : public HasModifier<DATA_TYPE>, public std::conditional<ENABLE_OUTLET, HasOutlet<DATA_TYPE>, void>::type, public AbstractParameter {
 public:
 
-    Parameter( std::string _paramName = "Parameter", DATA_TYPE _value = DATA_TYPE() ) : AbstractParameter(_paramName), dataValue(_value) {
+    Parameter( std::string _paramName = "Parameter", DATA_TYPE _value = DATA_TYPE() ) : HasModifier<DATA_TYPE>(dataValue), AbstractParameter(_paramName), dataValue(_value) {
 //# ifdef OFXVP_DEBUG_PARAMS
 //        ofLogNotice(std::string(OFXVP_DEBUG_PARAMS_PREPEND)+"_primary") <<  __PRETTY_FUNCTION__;
 //# endif
@@ -736,12 +744,13 @@ protected:
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VPPARAM_OUTLET_TO_INLET")){
                 //IM_ASSERT(payload->DataSize == sizeof(ofxVPHasUID::stringKeyType::value_type*));
                 ofxVPHasUID::stringKeyType outletParmName = static_cast<ofxVPHasUID::stringKeyType::value_type*>(payload->Data);//static_cast<std::string*>((*data));
+                std::cout << "Dropped target on source(outlet)=" << outletParmName << " --> target(inlet)=" << this->getUID() << std::endl;
 
                 // try to connect
                 if( ofxVPHasUID* outletHasUID = ofxVPHasUID::getInstanceByUID(outletParmName) ){
                     // Don't connect with self !
                     if( static_cast<ofxVPHasUID*>(this) == outletHasUID ){
-                        ofLogNotice("Parameter") << "Notice: Not connecting the parameter with itself !" << std::endl;
+                        ofLogVerbose("Parameter") << "Notice: Not connecting the parameter with itself !" << std::endl;
                     }
                     else {
                         // try to parse it as a parameter
@@ -767,7 +776,6 @@ protected:
                 else {
                     std::cout << "Cannot find an instance named: " << outletParmName << "." << std::endl;
                 }
-                std::cout << "Dropped target on source(outlet)=" << outletParmName << " --> target(inlet)=" << this->getUID() << std::endl;
             } // end VPPARAM_OUTLET_TO_INLET
 
             // Handle dropping a parameter connection request
@@ -958,10 +966,14 @@ public:
         return this->AbstractHasInlet::linkType == _linktype;
         // todo : make this work for similar link types ? ( ex: int/float/double = numeric)
     };
+    virtual bool acceptsOutletInstance( HasOutlet<MODIFIER_TYPE>& _outletInstance ) const override {
+        // todo: also check if _outletInstance == [the HasOutlet eventuelly associated with the inlet via the parameter]
+        return &_outletInstance.getOutputValue() != abstractParamModifier::parent.underlyingValueAddr;
+    };
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {
         //std::cout << "Modifier<T>::connectWithOutlet() --> connecting parameter" << std::endl;
         if( !acceptsLinkType( _outlet.linkType ) ){
-            ofLogNotice("ParamInletModifierconnectWithOutlet()") << " --> incompatible link type ! (" << getLinkName<MODIFIER_TYPE>() << " <<  vs " << getLinkName(_outlet.linkType) << ")" << std::endl;
+            ofLogNotice("ParamInletModifier::ConnectWithOutlet()") << "Incompatible link type ! (" << getLinkName<MODIFIER_TYPE>() << " <<  vs " << getLinkName(_outlet.linkType) << ")" << std::endl;
             return false;
         }
 
@@ -984,9 +996,17 @@ public:
             return false;
         }
 
+        if( !acceptsOutletInstance( *myLink.fromPinTyped ) ){
+            ofLogNotice("ParamInletModifier::ConnectWithOutlet()") << "Incompatible link instance ! (" << _outlet.getPinLabel() << " and " << this->getPinLabel() <<", most probably you tried to create a connection loop)" << std::endl;
+            myLink.isConnected = false;
+            myLink.fromPinTyped = nullptr;
+            myLink.fromPin = nullptr;
+            return false;
+        }
+
         // Register @ fromPin
         if(!myLink.fromPinTyped->registerPinLink(myLink)){
-            ofLogNotice() << "ParamInletModifier " << this->getPinLabel() << " could not register @ parameter outlet " << myLink.fromPin->getPinLabel();
+            ofLogNotice("ParamInletModifier::ConnectWithOutlet()") << this->getPinLabel() << " could not register @ parameter outlet " << myLink.fromPin->getPinLabel();
             myLink.isConnected = false;
             myLink.fromPinTyped = nullptr;
             myLink.fromPin = nullptr;
