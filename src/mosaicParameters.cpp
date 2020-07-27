@@ -4,11 +4,11 @@
 // Initialise static members
 std::vector<AbstractParameter*> AbstractParameter::allParams = std::vector<AbstractParameter*>();
 
-template<> LinkType getLinkType<long double>() { return VP_LINK_NUMERIC; };
-template<> LinkType getLinkType<float>() { return VP_LINK_NUMERIC; };
-template<> LinkType getLinkType<int>() { return VP_LINK_NUMERIC; };
-template<> LinkType getLinkType<std::string>() { return VP_LINK_STRING; };
-template<> LinkType getLinkType<char[]>() { return VP_LINK_STRING; };
+template<> LinkType& getLinkType<long double>() { static LinkType link_double = VP_LINK_NUMERIC; return link_double; };
+template<> LinkType& getLinkType<float>() { static LinkType link_float = VP_LINK_NUMERIC; return link_float; };
+template<> LinkType& getLinkType<int>() { static LinkType link_int = VP_LINK_NUMERIC; return link_int; };
+template<> LinkType& getLinkType<std::string>() { static LinkType link_string = VP_LINK_STRING; return link_string; };
+template<> LinkType& getLinkType<char[]>() { static LinkType link_char = VP_LINK_STRING; return link_char; };
 //template<> LinkType getLinkType<array>() { return VP_LINK_ARRAY; };
 //template<> LinkType getLinkType<ofTexture>() { return VP_LINK_TEXTURE; };
 //template<> LinkType getLinkType<ofSoundBuffer>() { return VP_LINK_SPECIAL; };
@@ -29,15 +29,12 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e){
 // - - - - - - - - - -
 // TYPE some parameters
 // - - - - - - - - - -
-// INT SPACIALISATIONS
+// INT SPECIALISATIONS
 template<>
 void Parameter<int>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
 
     ImGui::AlignTextToFramePadding();
-
-    // inlet connector
-    ImGuiDrawParamConnector(true);
 
     if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
@@ -53,13 +50,13 @@ void Parameter<int>::drawImGui() {
     }
 
     // listen for GUI connections
-    ImGuiListenForParamDrop();
+    this->ImGuiListenForParamDrop();
 
     // tmp, menu
-    ImGuiShowInfoMenu();
+    this->ImGuiShowInfoMenu();
 
     // outlet connector
-    ImGuiDrawParamConnector();
+    //ImGuiDrawParamConnector();
 
     ImGui::PopID();
 };
@@ -74,13 +71,13 @@ bool Parameter<int>::unserialize( const std::string& _value, const bool& _unseri
     return true;
 };
 // - - - - - - - - - -
-// FLOAT SPACIALISATIONS
+// FLOAT SPECIALISATIONS
 template<>
 void Parameter<float>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
 
     // inlet connector
-    ImGuiDrawParamConnector(true);
+    //this->drawImGuiParamPin(true);
 
     if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
@@ -94,13 +91,13 @@ void Parameter<float>::drawImGui() {
     }
 
     // listen for GUI connections
-    ImGuiListenForParamDrop();
-
-    // tmp, menu
-    ImGuiShowInfoMenu();
+    this->ImGuiListenForParamDrop();
 
     // outlet connector
-    ImGuiDrawParamConnector();
+    //this->drawImGuiParamPin(false);
+
+    // tmp, menu
+    this->ImGuiShowInfoMenu();
 
     ImGui::PopID();
 };
@@ -118,13 +115,13 @@ bool Parameter<float>::unserialize( const std::string& _value, const bool& _unse
     return true;
 };
 // - - - - - - - - - -
-// STRING SPACIALISATIONS
+// STRING SPECIALISATIONS
 template<>
 void Parameter<std::string>::drawImGui() {
     ImGui::PushID(this->getUID().c_str()); // todo: do this before calling drawImGui() ?
 
     // inlet connector
-    ImGuiDrawParamConnector(true);
+    //ImGuiDrawParamConnector(true);
 
     if(!this->getIsEditable()){
         //ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true); // todo: wrap this inner ImGui function into a small ImGuiEx
@@ -144,7 +141,7 @@ void Parameter<std::string>::drawImGui() {
     ImGuiShowInfoMenu();
 
     // outlet connector
-    ImGuiDrawParamConnector();
+    //ImGuiDrawParamConnector();
 
     ImGui::PopID();
 };

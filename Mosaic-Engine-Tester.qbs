@@ -13,8 +13,6 @@ Project{
 
         files: [
             'src/main.cpp',
-            'src/imgui_stdlib.cpp',
-            'src/imgui_stdlib.h',
             'src/mosaicNode.cpp',
             'src/mosaicNode.h',
             'src/ofApp.cpp',
@@ -23,18 +21,29 @@ Project{
             'src/ofxVPHasUid.h',
             'src/mosaicParameters.cpp',
             'src/mosaicParameters.h',
+            'src/imgui/imgui_controls.cpp',
+            'src/imgui/imgui_controls.h',
+            'src/imgui/imgui_helpers.h',
+            'src/imgui/imgui_node_canvas.cpp',
+            'src/imgui/imgui_node_canvas.h',
+            'src/imgui/imgui_plot.cpp',
+            'src/imgui/imgui_plot.h',
+            'src/imgui/imgui_profiler.h',
+            'src/imgui/imgui_stdlib.cpp',
+            'src/imgui/imgui_stdlib.h',
         ]
 
         of.addons: [
             'ofxImGui',
             'ofxXmlSettings',
+            'ofxInfiniteCanvas',
         ]
 
         // additional flags for the project. the of module sets some
         // flags by default to add the core libraries, search paths...
         // this flags can be augmented through the following properties:
         of.pkgConfigs: []       // list of additional system pkgs to include
-        of.includePaths: []     // include search paths
+        of.includePaths: ['src/imgui']     // include search paths
         of.cFlags: []           // flags passed to the c compiler
         of.cxxFlags: []         // flags passed to the c++ compiler
         of.linkerFlags: []      // flags passed to the linker

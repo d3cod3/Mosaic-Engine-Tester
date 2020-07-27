@@ -8,6 +8,15 @@ void ofApp::setup(){
 
     this->gui.setup();
 
+    // Set pan-zoom canvas
+    canvas.disableMouseInput();
+    canvas.setbMouseInputEnabled(true);
+    canvas.toggleOfCam();
+    //easyCam.enableOrtho();
+
+    updateCanvasViewport();
+
+
     // TESTING SCENARIO, ADD 3 NODES
 
     nodesMap[0] = std::shared_ptr<mosaicNode>(new mosaicNode(0));
@@ -32,7 +41,7 @@ void ofApp::setup(){
 
 //--------------------------------------------------------------
 void ofApp::update(){
-
+    updateCanvasViewport();
     ofSetWindowTitle("Mosaic Engine Tester");
 
     // update nodes
@@ -44,19 +53,60 @@ void ofApp::update(){
 //--------------------------------------------------------------
 void ofApp::draw(){
 
-    ofBackground(20);
+    ofPushView();
+    ofPushStyle();
+    ofPushMatrix();
+
+    // Init canvas
+    nodeCanvas.SetTransform( canvas.getTranslation(), canvas.getScale() );//canvas.getScrollPosition(), canvas.getScale(true) );
+
+    canvas.begin(canvasViewport);
+
+    ofEnableAlphaBlending();
+    ofSetCurveResolution(50);
+    ofSetColor(255);
+    ofSetLineWidth(1);
 
     this->gui.begin();
+    ImGui::SetNextWindowPos(canvasViewport.getTopLeft(), ImGuiCond_Always );
+    ImGui::SetNextWindowSize( ImVec2(canvasViewport.width, canvasViewport.height), ImGuiCond_Always );
+    bool isCanvasVisible = nodeCanvas.Begin("ofxVPNodeCanvas" );
 
-    {
-        // draw nodes
+    // END VP DRAW
+
+    if ( isCanvasVisible ){
+        // draw nodes (will be in PatchObject)
         for(map<int,shared_ptr<mosaicNode>>::iterator it = nodesMap.begin(); it != nodesMap.end(); it++ ){
-            it->second->draw();
+            shared_ptr<mosaicNode> node = it->second;
+
+            // Let objects draw their own Gui
+            //node->drawObjectNodeGui( _nodeCanvas );
+            //node->draw();
+            node->drawObjectNodeGui( nodeCanvas );
+
         }
 
     }
 
+    // Close canvas
+    if ( isCanvasVisible ) nodeCanvas.End();
+
+    // We're done drawing to IMGUI
     this->gui.end();
+
+    canvas.end();
+
+    ofDisableAlphaBlending();
+
+    ofPopMatrix();
+    ofPopStyle();
+    ofPopView();
+
+    // Graphical Context
+    canvas.update();
+
+    // LIVE PATCHING SESSION
+    //drawLivePatchingSession();
 }
 
 //--------------------------------------------------------------
@@ -75,21 +125,41 @@ void ofApp::keyReleased(int key){
 }
 
 //--------------------------------------------------------------
-void ofApp::mouseMoved(int x, int y ){
+void ofApp::mouseMoved(ofMouseEventArgs &e){
 
 }
 
 //--------------------------------------------------------------
-void ofApp::mouseDragged(int x, int y, int button){
+void ofApp::mouseDragged(ofMouseEventArgs &e){
+    if(ImGui::IsAnyItemActive() || nodeCanvas.isAnyNodeHovered() || ImGui::IsAnyItemHovered() )// || ImGui::IsAnyWindowHovered())
+        return;
 
+    canvas.mouseDragged(e);
 }
 
 //--------------------------------------------------------------
-void ofApp::mousePressed(int x, int y, int button){
+void ofApp::mousePressed(ofMouseEventArgs &e){
+    if(ImGui::IsAnyItemActive() || nodeCanvas.isAnyNodeHovered() || ImGui::IsAnyItemHovered() )
+        return;
 
+    canvas.mousePressed(e);
 }
 
 //--------------------------------------------------------------
-void ofApp::mouseReleased(int x, int y, int button){
+void ofApp::mouseReleased(ofMouseEventArgs &e){
+    if(ImGui::IsAnyItemActive() || nodeCanvas.isAnyNodeHovered() || ImGui::IsAnyItemHovered() )
+        return;
 
+    canvas.mouseReleased(e);
+}
+void ofApp::mouseScrolled(ofMouseEventArgs &e){
+
+    if(ImGui::IsAnyItemActive() || nodeCanvas.isAnyNodeHovered() || ImGui::IsAnyItemHovered())// | ImGui::IsAnyWindowHovered() )
+        return;
+
+    canvas.mouseScrolled(e);
+}
+
+void ofApp::updateCanvasViewport(){
+    canvasViewport.set(0,0,ofGetWindowWidth(),ofGetWindowHeight());
 }

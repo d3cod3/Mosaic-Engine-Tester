@@ -161,6 +161,19 @@ public:
         return nullptr;
     };
 
+    // Helper tool to cast your UID as a certain type
+    template<typename FULLTYPE>
+    static FULLTYPE* getTypedInstanceByUID(const stringKeyType& _key) {
+        // Try to get the instance
+        if( ofxVPHasUID* hasUID = ofxVPHasUID::getInstanceByUID(_key) ){
+            // try to parse it as a FULLTYPE
+            if( FULLTYPE* fullType = dynamic_cast<FULLTYPE*>(hasUID)){
+                return fullType;
+            }
+        }
+        return nullptr;
+    };
+
     static const std::map<ofxVPHasUID*, stringKeyType>& getAllUIDs(){
         return allUIDs;
     }

@@ -47,8 +47,10 @@
 #include <iostream>
 #include <list>
 
-#include "ofxVPHasUid.h"
+#include "imgui.h"
 #include "imgui_stdlib.h"
+#include "imgui_node_canvas.h"
+#include "ofxVPHasUid.h"
 #include "ofxXmlSettings.h"
 
 // - - - - - - - - - -
@@ -57,14 +59,14 @@
 // Todo: make this a factory.
 // all possible links
 enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
-    VP_LINK_UNDEFINED = 777, // NULLPTR / UNDEFINED_TYPE equivalence ??
-    VP_LINK_NUMERIC = 0,
-    VP_LINK_STRING = 1,
-    VP_LINK_ARRAY = 2,
-    VP_LINK_TEXTURE = 3,
-    VP_LINK_AUDIO = 4,
-    VP_LINK_SPECIAL = 5,
-    VP_LINK_PIXELS = 6
+    VP_LINK_UNDEFINED   = 777, // NULLPTR / UNDEFINED_TYPE equivalence ??
+    VP_LINK_NUMERIC     = 0,
+    VP_LINK_STRING      = 1,
+    VP_LINK_ARRAY       = 2,
+    VP_LINK_TEXTURE     = 3,
+    VP_LINK_AUDIO       = 4,
+    VP_LINK_SPECIAL     = 5,
+    VP_LINK_PIXELS      = 6,
 };
 // Convert enum to string
 inline const char* ToString(const LinkType& v){
@@ -99,9 +101,15 @@ inline const char* ToString(const LinkType& v){
 
 //};
 template<typename DATA_TYPE>
-inline LinkType getLinkType() {
-    return VP_LINK_UNDEFINED;
+inline LinkType& getLinkType() {
+    static LinkType link_undefined = VP_LINK_UNDEFINED;
+    return link_undefined;
 };
+template<typename DATA_TYPE>
+inline LinkType& getLinkType(const DATA_TYPE& _value) {
+    return getLinkType<DATA_TYPE>();
+}
+
 template<typename DATA_TYPE>
 inline const char* getLinkName() {
     return "VP_LINK_UNDEFINED";
@@ -164,9 +172,9 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e);
 class AbstractHasInlet;
 class AbstractHasOutlet;
 
-class AbstractPinLink : public ofxVPHasUID { // todo: does this need an UID ?
+class AbstractPinLink /*: public ofxVPHasUID*/ { // todo: does this need an UID ?
 public:
-    AbstractPinLink( AbstractHasInlet& _parent ) : ofxVPHasUID("PinLink"), toPin(_parent) {
+    AbstractPinLink( AbstractHasInlet& _parent ) : /*ofxVPHasUID("PinLink"),*/ toPin(_parent) {
 
     };
     virtual ~AbstractPinLink(){};
@@ -211,10 +219,11 @@ public:
     // these 2 prevent the need of virtual inheritance, which keeps things easier
     virtual AbstractHasModifier& getAsHasModifier() = 0;
     virtual bool hasOutlet() const = 0;
-    virtual AbstractHasOutlet& getAsOutlet() = 0;
+    virtual AbstractHasOutlet& getAsOutlet() = 0; // todo: rename method with "try" in it, as it needs a catch
     virtual bool getIsEditable() const {
         return isEditable;
     };
+    virtual void drawImGuiParamPin(ImGuiEx::NodeCanvas& _nodeCanvas, const bool& _drawInlet=false) = 0;
 
     // conversion
     AbstractParameter& getAsAbstract(){ return *this; };
@@ -275,6 +284,29 @@ public:
 
     virtual bool acceptsLinkType( const LinkType& _linktype ) = 0;
     //virtual accept();
+    bool connectWithOutlet(std::string _paramUID){
+        // Try to get the instance
+        if( AbstractParameter* abstractParam = ofxVPHasUID::getTypedInstanceByUID<AbstractParameter>(_paramUID) ){
+            if(abstractParam->hasOutlet()){
+                try {
+                    if( this->connectWithOutlet( abstractParam->getAsOutlet() ) ){
+                        // Connection done ! :)
+                        return true;
+                    }
+                    else {
+                        ofLogNotice("Parameter") << "The inlet param (me) did not accept a connection with "<< _paramUID << ". Maybe it doesn't accept my data type ?";
+                    }
+                } catch (...) {
+                    ofLogNotice("Parameter") << "Could not parse outlet " << _paramUID << " as an outlet !" << std::endl;
+                }
+            }
+        }
+        else {
+            ofLogNotice("Parameter") << "Could not parse " << _paramUID << " as a parameter ! Not connecting." << std::endl;
+        }
+
+        return false;
+    };
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) = 0; // return bool or PinLink&  ?
     virtual bool disconnectPin() = 0;
 
@@ -284,7 +316,9 @@ public:
     virtual void triggerValueChanged() = 0; // todo
     //virtual const std::string& getPinLabel() const override = 0;
 
-    std::shared_ptr<AbstractPinLink> connectedLink;
+    std::shared_ptr<AbstractPinLink> connectedLink; // todo: not to be shared_ptr ?
+
+    ImVec2 inletPosition = ImVec2(0,0); // Public so ImGui can change it
 };
 
 template<typename ACCEPT_TYPE>
@@ -328,16 +362,18 @@ public:
     };
 
     virtual const AbstractPinLink& tryGetPinLink(const int& _index) = 0;
+    virtual int getNumConnections() const = 0;
 
     // todo
     //std::vector<AbstractPinLink*> pinLinks;
 
     //const std::string dataLabel;
     //const LinkType linkType;
-    virtual void visualiseData() = 0;
+    virtual void visualiseData() = 0; // todo : implement this
     const bool& dataHasChanged() const {
         return bFlagDataChanged;
     }
+    ImVec2 outletPosition = ImVec2(0,0); // Public so ImGui can change it
 protected:
     bool bFlagDataChanged = false;
 };
@@ -345,7 +381,9 @@ protected:
 template<typename OUTPUT_TYPE>
 class HasOutlet : public AbstractHasOutlet {
 public:
-    HasOutlet() : AbstractHasOutlet( getLinkType< OUTPUT_TYPE >() ) {};
+    HasOutlet() : AbstractHasOutlet( getLinkType< OUTPUT_TYPE >() ) {
+        //std::cout << "HasOutlet = " << getLinkType< OUTPUT_TYPE >() << " / "  << getLinkName(this->linkType) << std::endl;
+    };
     virtual ~HasOutlet() {
         // todo: notify others
     };
@@ -358,7 +396,7 @@ public:
     // todo: un-virtual this by assigning a constant reference to HasOutlet's data value (?)
     virtual const OUTPUT_TYPE& getOutputValue() = 0;
 
-    virtual int getNumConnections(){
+    virtual int getNumConnections() const override {
         return connectedPinLinks.size();
     };
 
@@ -413,6 +451,14 @@ public:
         //std::cout << "HasOutlet::onPinDisconnected();"<< std::endl;
     };
 
+    // Don't rename the functions as this allows usage with range-based iterators.
+    typename std::list< PinLink<OUTPUT_TYPE>* >::const_iterator begin() const noexcept {
+        return connectedPinLinks.cbegin();
+    };
+    typename std::list< PinLink<OUTPUT_TYPE>* >::const_iterator end() const noexcept {
+        return connectedPinLinks.cend();
+    };
+
 private:
     // todo: this should probably be AbstractPinlink to allow easier type-compatibility
     std::list< PinLink<OUTPUT_TYPE>* > connectedPinLinks; // only references, not owned
@@ -429,9 +475,14 @@ public:
     const enum OFXVP_MODIFIER_ modifierType;// = OFXVP_MODIFIER_UNKNOWN;
 };
 
+// The address-of operator (&) can only be used with an lvalue.
+#define IS_LVALUE(x) ( (sizeof &(x)), (x) )
+
 class AbstractHasModifier { // todo: rename to AbstractHasModifiers
 public:
-    AbstractHasModifier(const void* _underlyingValue) : underlyingValueAddr(_underlyingValue){};
+    AbstractHasModifier(const LinkType& _linkType, const void* _underlyingValue) : underlyingValueAddr(_underlyingValue), linkType(_linkType){
+        //std::cout << "AbstractHasModifier() " << (AbstractHasModifier*)this << " type = " << (this->linkType) << "/" << _linkType <<" - " << IS_LVALUE(_linkType) << std::endl;
+    };
     virtual ~AbstractHasModifier(){};
     //virtual bool addModifier() = 0;
     const AbstractHasModifier& getAbstractHasModifier() {
@@ -467,7 +518,13 @@ public:
     bool hasModifier() const {
         // Ensure correct usage by allowing only deriveds of abstractParamModifier
         static_assert(std::is_base_of<abstractParamModifier, MODIFIER_TYPE>::value, "MODIFIER_TYPE should inherit from abstractParamModifier* !!!");
+        //static_assert( std::is_same< decltype(MODIFIER_TYPE::modifierType), decltype(abstractParamModifier::modifierType) >::value , " This modifier has no modifierType value. Please define one in your class. ");
+        static_assert( MODIFIER_TYPE::modifierType, " This modifier has no modifierType value. Please define one in your class. ");
 
+        // Sadly, doesn't work as this templated function is implicitly instanciated before MODIFIER_TYPE::modifierType
+        //return this->hasModifier( MODIFIER_TYPE::modifierType );
+
+        // Fallback
         for(abstractParamModifier* apm : abstractParamModifiers){
             if( apm->modifierType == MODIFIER_TYPE::modifierType ){
                 return true;
@@ -477,24 +534,46 @@ public:
         return false;
     };
 
+    bool hasModifier( const OFXVP_MODIFIER_& _type ) const {
+        for(abstractParamModifier* apm : abstractParamModifiers){
+            if( apm->modifierType == _type ){
+                return true;
+                break;
+            }
+        }
+        return false;
+    };
+    abstractParamModifier* tryGetAbstractModfier( const OFXVP_MODIFIER_& _type ) const {
+        for(abstractParamModifier* apm : abstractParamModifiers){
+            if( apm->modifierType == _type ){
+                return apm;
+                break;
+            }
+        }
+        return nullptr;
+    };
+
     int getNumModifiers() const {
         return abstractParamModifiers.size();
     };
 
     virtual const std::string& getHasModifierName() const = 0;
+    virtual ImVec2& getInletPosition() = 0;
 
     // TYPED API METHODS
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) = 0; // to return bool or PinLink&  ?
 
     std::list<abstractParamModifier*> abstractParamModifiers;
     const void* underlyingValueAddr;
+
+    const LinkType& linkType; // wrong ? should be in hasOutlet ?
 };
 
 template<typename ACCEPT_TYPE>
 class HasModifier : public AbstractHasModifier {
 public:
-    HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( &_underlyingValue ) {
-
+    HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( getLinkType<ACCEPT_TYPE>() , &_underlyingValue ) {
+        //std::cout << "HasModifier() type = " << getLinkType<ACCEPT_TYPE>() << " - " << (this->AbstractHasModifier::linkType) << std::endl;
     };
     virtual ~HasModifier(){
         for(ParamModifier<ACCEPT_TYPE>* modifier : paramModifiers){
@@ -503,12 +582,35 @@ public:
         paramModifiers.clear();
         abstractParamModifiers.clear();
     };
-    virtual bool addModifier() /*override*/ { // todo : return bool ?
+    virtual bool addModifier() /*override*/ { // todo : Remove this func ? (replaced by getOrCreateModifier....)
         // tmp, only inletmodifiers
         const AbstractHasModifier& tmp = this->getAbstractHasModifier();
         paramModifiers.push_back( new ParamInletModifier<ACCEPT_TYPE>( tmp ) );
         abstractParamModifiers.push_back( paramModifiers.back() ); // always keep abstracts synced
         return true;
+    };
+    bool connectWithOutlet(std::string _paramUID){
+        // Try to get the instance
+        if( AbstractParameter* abstractParam = ofxVPHasUID::getTypedInstanceByUID<AbstractParameter>(_paramUID) ){
+            if(abstractParam->hasOutlet()){
+                try {
+                    if( this->connectWithOutlet( abstractParam->getAsOutlet() ) ){
+                        // Connection done ! :)
+                        return true;
+                    }
+                    else {
+                        ofLogNotice("Parameter") << "The inlet param (me) did not accept a connection with "<< _paramUID << ". Maybe it doesn't accept my data type ?";
+                    }
+                } catch (...) {
+                    ofLogNotice("Parameter") << "Could not parse outlet " << _paramUID << " as an outlet !" << std::endl;
+                }
+            }
+        }
+        else {
+            ofLogNotice("Parameter") << "Could not parse " << _paramUID << " as a parameter ! Not connecting." << std::endl;
+        }
+
+        return false;
     };
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {
         //std::cout << "HasModifier<T=" << getLinkName<ACCEPT_TYPE>() << ">::connectWithOutlet() --> connecting parameter" << std::endl;
@@ -529,6 +631,12 @@ public:
         return ret;
     };
 
+    virtual ImVec2& getInletPosition() override final {
+        ParamInletModifier<ACCEPT_TYPE>& inletModifier = this->getOrCreateModifier< ParamInletModifier<ACCEPT_TYPE> >();
+
+        return inletModifier.inletPosition;
+    };
+
     template<typename MODIFIER_TYPE>
     MODIFIER_TYPE& getOrCreateModifier() {
         // Ensure correct usage by allowing only deriveds of abstractParamModifier
@@ -539,7 +647,12 @@ public:
         // Search for any existing one
         for(ParamModifier<ACCEPT_TYPE>* pm : paramModifiers){
             if( pm->modifierType == MODIFIER_TYPE::modifierType ){
-                return static_cast< MODIFIER_TYPE& >(*pm);
+                try {
+                    return static_cast< MODIFIER_TYPE& >(*pm);
+                } catch(...){
+                    ofLogWarning("Parameter<T>::getOrCreateModifier()") << "Misbehaviour ! The inletmodifier type exists but is not parseable as the requested sub-type. (this should never happen)";
+                    break; // return new instance
+                }
             }
         }
 
@@ -560,11 +673,17 @@ template<typename DATA_TYPE, bool ENABLE_OUTLET=true>
 class Parameter : public HasModifier<DATA_TYPE>, public std::conditional<ENABLE_OUTLET, HasOutlet<DATA_TYPE>, void>::type, public AbstractParameter {
 public:
 
-    Parameter( std::string _paramName = "Parameter", DATA_TYPE _value = DATA_TYPE() ) : HasModifier<DATA_TYPE>(dataValue), AbstractParameter(_paramName), dataValue(_value) {
+    Parameter( std::string _paramName = "Parameter", DATA_TYPE _value = DATA_TYPE() ) : HasModifier<DATA_TYPE>(dataValue), std::conditional<ENABLE_OUTLET, HasOutlet<DATA_TYPE>, void>::type(), AbstractParameter(_paramName), dataValue(_value) {
 //# ifdef OFXVP_DEBUG_PARAMS
 //        ofLogNotice(std::string(OFXVP_DEBUG_PARAMS_PREPEND)+"_primary") <<  __PRETTY_FUNCTION__;
 //# endif
         //std::cout << "After " << this->getUID() << " (done)" << std::endl;
+        //std::cout <<  __PRETTY_FUNCTION__ << std::endl;
+        //std::cout << this->getUID() << " " << (AbstractHasModifier*)this << ". Linktypes ( "<< this->AbstractHasModifier::linkType <<"["<< getLinkType< DATA_TYPE >() << "]" <<" / "<< this->AbstractHasOutlet::linkType <<" ) = " << getLinkName(this->AbstractHasModifier::linkType) << " - " << getLinkName(this->AbstractHasOutlet::linkType) << std::endl;
+
+        // Check correct behaviour if this assert is triggered. (undefined behavior for now)
+        assert(this->AbstractHasInlet::linkType == this->AbstractHasOutlet::linkType);// "Inlet and Outlet have different linktypes. This is not yet supported. Please use 2 distinct parameters instead." );
+        //assert( this->AbstractHasInlet::linkType == VP_LINK_UNDEFINED ); // Undefined link type. You have to give one !
     };
     using HasModifier<DATA_TYPE>::paramModifiers;
 
@@ -670,13 +789,17 @@ public:
     // todo: enable only if : virtual typename std::enable_if<ENABLE_OUTLET>::type
     virtual AbstractHasOutlet& getAsOutlet() override final {
         if( this->hasOutlet() ){
-            //return *((AbstractHasOutlet*) this);
-            return (AbstractHasOutlet&) *this;
+            try {
+                return static_cast<AbstractHasOutlet&>(*this);
+            }
+            catch(...){
+                // Throw error below
+            }
         }
-        else {
-            // impossible to parse non-outlet param to outlet param.
-            throw VPError(VPErrorCode_LINK, VPErrorStatus_NOTICE, std::string("Cannot get outlet of parameter «") + this->getUID() + "» : it hasn't got an outlet !");
-        }
+
+        // impossible to parse non-outlet param to outlet param.
+        throw VPError(VPErrorCode_LINK, VPErrorStatus_NOTICE, std::string("Cannot get outlet of parameter «") + this->getUID() + "» : it hasn't got an outlet !");
+
     };
 
     // Non abstract API functions (typed)
@@ -739,7 +862,7 @@ public:
 
     // ImGui Helpers
 protected:
-    void ImGuiListenForParamDrop(){
+    void ImGuiListenForParamDrop(){ // todo: remove this method
         if ( ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VPPARAM_OUTLET_TO_INLET")){
                 //IM_ASSERT(payload->DataSize == sizeof(ofxVPHasUID::stringKeyType::value_type*));
@@ -819,19 +942,114 @@ protected:
             ImGui::EndDragDropTarget();
         }
     };
-    void ImGuiDrawParamConnector(const bool& _drawInlet=false) const {
+    // Use _drawInlet to choose between inlet/outlet - left/right
+    virtual void drawImGuiParamPin(ImGuiEx::NodeCanvas& _nodeCanvas, const bool& _drawInlet=false) override final {
         // Show source connect handle
-        if( ENABLE_OUTLET ){ //this->hasOutlet() ){
-            if(!_drawInlet) ImGui::SameLine();
-            ImGui::Button(_drawInlet?"<--":"-->");
-            if( ImGui::BeginDragDropSource(ImGuiDragDropFlags_None) ){
-                //ImGui::SetDragDropPayload("TEST", ((std::string::value_type**) this->getUID().c_str() ), sizeof(std::string::value_type*), ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
-                const ofxVPHasUID::stringKeyType& UID = this->getUID();
-                ImGui::SetDragDropPayload(_drawInlet?"VPPARAM_INLET_TO_OUTLET":"VPPARAM_OUTLET_TO_INLET", UID.data(), UID.size()+1, ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
-                ImGui::Text(_drawInlet?"Connect %s (inlet) with an outlet...":"Connect %s (outlet) with an inlet...", UID.c_str());
-                ImGui::EndDragDropSource();
+        if( _drawInlet || (ENABLE_OUTLET) ){
+            //if(!_drawInlet) ImGui::SameLine();
+//            ImGui::Button(_drawInlet?"<--":"-->");
+//            if( ImGui::BeginDragDropSource(ImGuiDragDropFlags_None) ){
+//                //ImGui::SetDragDropPayload("TEST", ((std::string::value_type**) this->getUID().c_str() ), sizeof(std::string::value_type*), ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
+//                const ofxVPHasUID::stringKeyType& UID = this->getUID();
+//                ImGui::SetDragDropPayload(_drawInlet?"VPPARAM_INLET_TO_OUTLET":"VPPARAM_OUTLET_TO_INLET", UID.data(), UID.size()+1, ImGuiCond_Once);    // Set payload to carry the index of our item (could be anything)
+//                ImGui::Text(_drawInlet?"Connect %s (inlet) with an outlet...":"Connect %s (outlet) with an inlet...", UID.c_str());
+//                ImGui::EndDragDropSource();
+//            }
+            //if(_drawInlet) ImGui::SameLine();
+            //_nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->inletPosition, getLinkName(this->AbstractHasModifier::linkType), IM_COL32(255,255,255,255), this->getNumModifiers()>0, _drawInlet?ImGuiExNodePinsFlags_Left:ImGuiExNodePinsFlags_Right );
+        }
+
+        // Draw inlet Pin
+        if(_drawInlet /*&& this->getIsEditable()*/){
+            // Parse connection status
+            AbstractHasModifier& paramHasModifier = this->getAsHasModifier();
+            bool isConnected = false;
+            if( paramHasModifier.getNumModifiers()>0 && this->hasModifier( OFXVP_MODIFIER_INLET ) ){
+                //this->template hasModifier<ParamInletModifier<DATA_TYPE> >()
+                ParamInletModifier<DATA_TYPE>& inlet = this->template getOrCreateModifier< ParamInletModifier<DATA_TYPE> >();
+                isConnected = inlet.isConnected();
             }
-            if(_drawInlet) ImGui::SameLine();
+            // Draw pin
+            ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->getInletPosition(), getLinkName(this->AbstractHasModifier::linkType), this->AbstractHasModifier::linkType, IM_COL32(255,255,255,255), isConnected, ImGuiExNodePinsFlags_Left );
+            if(pinData){
+                if( pinData.flag == ImGuiExNodePinActionFlags_ConnectPin ){
+                    if( this->connectWithOutlet( std::string( pinData.otherUid ) ) ){
+                        // do nothing, continue as normal
+                    }
+                    else {
+                        ofLogNotice("Parameter::drawImGuiParamPin()") << "Me, the inlet " << this->getUID() << " refused to connect with outlet =" << pinData.otherUid;
+                    }
+                }
+                else if( pinData.flag == ImGuiExNodePinActionFlags_DisconnectPin ){
+                    // ...
+                }
+                else {
+                    ofLogNotice("Parameter::drawImGuiParamPin()") << "Unimplemented menu action. This might need your attention !";
+                }
+            }
+
+        }
+        // Draw outlet pin
+        else if( /*!_drawInlet &&*/ ENABLE_OUTLET){
+            try {
+                // Todo: paramOutlet could also be typed...
+                AbstractHasOutlet& paramOutlet = this->getAsOutlet();
+
+                bool hasConnections = paramOutlet.getNumConnections() > 0;
+                ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), paramOutlet.getPinLabel().c_str(), paramOutlet.outletPosition, getLinkName(paramOutlet.linkType), paramOutlet.linkType, IM_COL32(255,255,255,255), hasConnections, ImGuiExNodePinsFlags_Right );
+                if( pinData ){
+                    if( pinData.flag == ImGuiExNodePinActionFlags_ConnectPin ){
+                        // get other as inlet
+                        if( AbstractHasModifier* inlet = ofxVPHasUID::getTypedInstanceByUID<AbstractHasModifier>( pinData.otherUid )){
+                            //AbstractHasInlet inlet = absInlet->getAsHasModifier();
+                            if( inlet->connectWithOutlet( paramOutlet ) ){
+                                // do nothing, continue as normal
+                            }
+                            else {
+                                ofLogNotice("Parameter::drawImGuiParamPin()") << "The inlet " << pinData.otherUid << " refused to connect with me=" << paramOutlet.getPinLabel();
+                            }
+                        }
+                        else {
+                            ofLogWarning("Parameter::drawImGuiParamPin()") << "Could not parse the UID " << pinData.otherUid << " as an inlet !";
+                        };
+                    }
+                    else if( pinData.flag == ImGuiExNodePinActionFlags_DisconnectPin ){
+                        // ...
+                    }
+                    else {
+                        ofLogNotice("Parameter::drawImGuiParamPin()") << "Unimplemented PinAction. This might need your attention !";
+                    }
+                }
+
+                // Draw Links
+                if(hasConnections){
+                    HasOutlet<DATA_TYPE>& typedOutlet = paramOutlet.getTypedOutlet< HasOutlet<DATA_TYPE> >();
+
+                    //for( const PinLink<DATA_TYPE>* link : typedOutlet ){ // not for erasing
+                    for( auto it = typedOutlet.begin(); it != typedOutlet.end(); ){
+                        const PinLink<DATA_TYPE>* link = *it;
+                        ++it; // advance iterator now so we can erase the link without crashing the loop
+                        if(!link || link->fromPinTyped == nullptr || !link->fromPinTyped ){
+                            continue;
+                        }
+
+                        if( ImGuiExNodeLinkActionFlags_ linkResult = _nodeCanvas.AddLink( link->fromPinTyped->outletPosition, link->toPinTyped.inletPosition, IM_COL32(200,200,200,200), "LABEL" ) ){
+                            // Disconnect ?
+                            if( linkResult == ImGuiExNodeLinkActionFlags_Disconnect ){
+                                //++it;
+                                link->toPin.disconnectPin();
+                            }
+                            else {
+                                if( linkResult != ImGuiExNodeLinkActionFlags_None){
+                                    ofLogNotice("Parameter::drawImGuiParamPin()") << "Unimplemented LinkAction. This might need your attention !";
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (...) {
+                // Ignore errors (normal behaviour)
+            }
         }
     }
 
@@ -957,7 +1175,11 @@ public:
     }
 
     virtual bool isEditable() const override {
-        return !myLink.isConnected;
+        return !myLink.isConnected; // todo: is this right ?
+    }
+
+    bool isConnected() const {
+        return myLink.isConnected;
     }
 
     // - - - - - - - - - -
@@ -967,7 +1189,7 @@ public:
         // todo : make this work for similar link types ? ( ex: int/float/double = numeric)
     };
     virtual bool acceptsOutletInstance( HasOutlet<MODIFIER_TYPE>& _outletInstance ) const override {
-        // todo: also check if _outletInstance == [the HasOutlet eventuelly associated with the inlet via the parameter]
+        // todo: also check if _outletInstance == [the HasOutlet eventually associated with the inlet via the parameter]
         return &_outletInstance.getOutputValue() != abstractParamModifier::parent.underlyingValueAddr;
     };
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {

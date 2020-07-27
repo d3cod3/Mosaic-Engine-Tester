@@ -71,6 +71,14 @@ void mosaicNode::setup(){
     parameters.push_back( &myStringParam );
     parameters.push_back( &myIntParam );
 
+    // NEED TO ADD vector<float>
+
+    // NEED TO ADD ofTexture
+
+    // NEED TO ADD ofSoundBuffer
+
+    // NEED TO ADD ofPixels
+
     // Other way for dynamic params
     myDynamicParams.resize(0);
     int rand = random() % 5;
@@ -126,7 +134,7 @@ void mosaicNode::update(std::map<int,std::shared_ptr<mosaicNode>> &nodes){
 }
 
 //--------------------------------------------------------------
-void mosaicNode::draw(){
+void mosaicNode::draw(){ // not needed anymore ?
     auto mainSettings = ofxImGui::Settings();
 
     std::string nodeName = "Node"+ofToString(this->_id);
@@ -159,6 +167,93 @@ void mosaicNode::draw(){
         };
     }
     ofxImGui::EndWindow(mainSettings);
+}
+//--------------------------------------------------------------
+void mosaicNode::drawObjectNodeGui( ImGuiEx::NodeCanvas& _nodeCanvas ){
+
+    ImVec2 imPos( this->x, this->y );
+    ImVec2 imSize( this->width, this->height );
+
+    if(_nodeCanvas.BeginNode( this->getUID().c_str(), this->getDisplayName(), imPos, imSize, this->getNumInlets(), this->getNumOutlets(), this->getIsResizable(), this->getIsTextureObject() )){
+
+        // Check menu state
+        if( _nodeCanvas.doNodeMenuAction(ImGuiExNodeMenuActionFlags_DeleteNode) ){
+            // ...
+        }
+        //else if( _nodeCanvas.doNodeMenuAction(ImGuiExNodeMenuActionFlags_CopyNode) ){
+        //          ofGetWindowPtr()->setClipboardString( this->serialize() );
+            // ofNotifyEvent(copyEvent, nId); ?
+        //}
+        else if( _nodeCanvas.doNodeMenuAction(ImGuiExNodeMenuActionFlags_DuplicateNode) ){
+            // ...
+        }
+
+        ImGui::Spacing();ImGui::Spacing();
+
+        // Draw Pins from parameters
+        if(false)for( AbstractParameter* param : this->parameters ){
+            //param->drawImGuiParamPin(nodeCanvas, true);
+            //param->drawImGuiParamPin(nodeCanvas, false);
+            continue;
+            // Draw inlet Pin
+            if(param->getIsEditable()){
+                AbstractHasModifier& paramHasModifier = param->getAsHasModifier();
+                _nodeCanvas.AddNodePin( param->getUID().c_str(), paramHasModifier.getHasModifierName().c_str(), paramHasModifier.getInletPosition(), getLinkName(paramHasModifier.linkType), paramHasModifier.linkType, IM_COL32(255,255,255,255), paramHasModifier.getNumModifiers()>0, ImGuiExNodePinsFlags_Left );
+            }
+            // Draw outlet pin
+            try {
+                AbstractHasOutlet& paramOutlet = param->getAsOutlet();
+                bool hasConnections = paramOutlet.getNumConnections() > 0;
+                _nodeCanvas.AddNodePin( param->getUID().c_str(), paramOutlet.getPinLabel().c_str(),paramOutlet.outletPosition, getLinkName(paramOutlet.linkType), paramOutlet.linkType, IM_COL32(255,255,255,255), hasConnections, ImGuiExNodePinsFlags_Right );
+                if(hasConnections){
+                    //nodeCanvas.addConnection();
+                }
+            } catch(...) {
+                // Ignore errors, normal behaviour
+            }
+        }
+
+        // Let objects draw their own Gui
+
+
+
+        // Automatic Parameters drawing.
+        ImGui::Separator();
+        ImGui::TextUnformatted("NEW PARAMETER API");
+        ImGui::Separator();
+
+        // Draw Pins from parameters
+        for( AbstractParameter* param : this->parameters ){
+            param->drawImGuiParamPin(_nodeCanvas, true);
+            param->drawImGuiParamPin(_nodeCanvas, false);
+        };
+
+        for( AbstractParameter* param : this->parameters ){
+            if(param==nullptr) continue;
+
+            //param->drawImGuiParamPin(_nodeCanvas, true);
+            param->drawImGuiEditable();
+            //param->drawImGuiParamPin(_nodeCanvas, false);
+        };
+
+
+
+    }
+    // Close Node
+    _nodeCanvas.EndNode();
+
+    // Update pos & size
+    if( imPos.x != this->x )
+        this->x = imPos.x;
+    if( imPos.y != this->y )
+        this->y = imPos.y;
+    if( imSize.x != this->width )
+        this->width = imSize.x;
+    if( imSize.y != this->height )
+        this->height = imSize.y;
+
+    //canvasTranslation   = _nodeCanvas.GetCanvasTranslation();
+    //canvasScale         = _nodeCanvas.GetCanvasScale();
 }
 
 //--------------------------------------------------------------
@@ -328,4 +423,17 @@ void mosaicNode::disconnectLink(std::map<int,std::shared_ptr<mosaicNode>> &nodes
         }
 
     }
+}
+
+int mosaicNode::getNumInlets(){
+    return numInlets;
+}
+int mosaicNode::getNumOutlets(){
+    return numOutlets;
+}
+int mosaicNode::getIsResizable(){
+    return true;
+}
+int mosaicNode::getIsTextureObject(){
+    return false;
 }
