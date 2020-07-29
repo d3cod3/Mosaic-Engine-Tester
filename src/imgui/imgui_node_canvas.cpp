@@ -1117,7 +1117,7 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
                 else {
                     // Reset
                     if(!ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
-                        std::cout << "Reset drag (after hover) by " << _dragDropData << std::endl;
+                        //std::cout << "Reset drag (after hover) by " << _dragDropData << std::endl;
                         activeLinkSourcePinUID = "";
                         pinIsBeingDragHovered = false;
                     }
@@ -1144,8 +1144,8 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
 
     // Send pin location to parent
     _pinPosition = (_pinFlag==ImGuiExNodePinsFlags_Left) ?
-                pinLayout.curDrawPos + ImVec2( IMGUI_EX_NODE_PIN_WIDTH * .5f, pinLayout.pinSpace.y * .5f) + ImVec2(IMGUI_EX_NODE_PIN_WIDTH,0) :
-                pinLayout.curDrawPos + ImVec2( IMGUI_EX_NODE_PIN_WIDTH * -.5f, pinLayout.pinSpace.y * .5f);
+                pinLayout.curDrawPos + ImVec2( pinLayout.pinSpace.x * +.5f - IMGUI_EX_NODE_PIN_WIDTH * .5f, pinLayout.pinSpace.y * .5f):
+                pinLayout.curDrawPos + ImVec2( pinLayout.pinSpace.x * -.5f /*- IMGUI_EX_NODE_PIN_WIDTH * .5f*/, pinLayout.pinSpace.y * .5f);
 
 
     // Draw target connection info label (pin being drag-hovered with an acceptable type)

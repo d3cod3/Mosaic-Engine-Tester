@@ -68,6 +68,17 @@ enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
     VP_LINK_SPECIAL     = 5,
     VP_LINK_PIXELS      = 6,
 };
+
+#define COLOR_NUMERIC           ofColor(210,210,210,255)
+#define COLOR_STRING            ofColor(200,180,255,255)
+#define COLOR_ARRAY             ofColor(120,255,120,255)
+#define COLOR_PIXELS            ofColor(0,  180,140,255)
+#define COLOR_TEXTURE           ofColor(120,255,255,255)
+#define COLOR_AUDIO             ofColor(255,255,120,255)
+#define COLOR_SCRIPT            ofColor(255,128,128,255)
+#define COLOR_SPECIAL           ofColor(255,255,255,255)
+#define COLOR_UNDEFINED         ofColor(0,  0,  0,  255)
+
 // Convert enum to string
 inline const char* ToString(const LinkType& v){
     switch (v){
@@ -97,26 +108,42 @@ inline const char* ToString(const LinkType& v){
     ofPixels: VP_LINK_PIXELS, \
     default: VP_LINK_UNDEFINED  \
 )(X)
-//struct LinkTypes {
 
-//};
 template<typename DATA_TYPE>
-inline LinkType& getLinkType() {
+inline LinkType& getLinkType() { // from value type to link type
     static LinkType link_undefined = VP_LINK_UNDEFINED;
     return link_undefined;
 };
-template<typename DATA_TYPE>
+template<typename DATA_TYPE>  // from value to link type
 inline LinkType& getLinkType(const DATA_TYPE& _value) {
     return getLinkType<DATA_TYPE>();
 }
 
 template<typename DATA_TYPE>
-inline const char* getLinkName() {
+inline const char* getLinkName() { // from link type
     return "VP_LINK_UNDEFINED";
 };
-inline const char* getLinkName(const LinkType& _linkType) {
+inline const char* getLinkName(const LinkType& _linkType) { // from link type
     return ToString(_linkType);
 };
+inline ofColor getLinkColor(const LinkType& _linkType) { // from link type
+    switch (_linkType) {
+        case VP_LINK_NUMERIC:       return COLOR_NUMERIC;
+        case VP_LINK_STRING:        return COLOR_STRING;
+        case VP_LINK_ARRAY:         return COLOR_ARRAY;
+        case VP_LINK_TEXTURE:       return COLOR_TEXTURE;
+        case VP_LINK_AUDIO:         return COLOR_AUDIO;
+        case VP_LINK_SPECIAL:       return COLOR_SPECIAL;
+        case VP_LINK_PIXELS:        return COLOR_PIXELS;
+        //case VP_LINK_SCRIPT:        return COLOR_SCRIPT;
+        default:                    return COLOR_UNDEFINED;
+    }
+};
+inline ImU32 getLinkImguiColor(const LinkType& _linkType) { // from link type
+    const ofColor& color = getLinkColor(_linkType);
+    return IM_COL32(color.r*255, color.g*255, color.b*255, color.a*255);
+};
+
 
 // - - - - - - - - - -
 enum OFXVP_MODIFIER_ {
@@ -142,6 +169,8 @@ inline std::string getModifierName(const OFXVP_MODIFIER_& _modifier) {
     }
     return "OFXVP_MODIFIER_UNKNOWN";
 };
+
+
 
 // - - - - - - - - - -
 // To move to an included file ?
@@ -970,7 +999,7 @@ protected:
                 isConnected = inlet.isConnected();
             }
             // Draw pin
-            ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->getInletPosition(), getLinkName(this->AbstractHasModifier::linkType), this->AbstractHasModifier::linkType, IM_COL32(255,255,255,255), isConnected, ImGuiExNodePinsFlags_Left );
+            ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->getInletPosition(), getLinkName(this->AbstractHasModifier::linkType), this->AbstractHasModifier::linkType, getLinkImguiColor(this->AbstractHasModifier::linkType), isConnected, ImGuiExNodePinsFlags_Left );
             if(pinData){
                 if( pinData.flag == ImGuiExNodePinActionFlags_ConnectPin ){
                     if( this->connectWithOutlet( std::string( pinData.otherUid ) ) ){
@@ -996,7 +1025,7 @@ protected:
                 AbstractHasOutlet& paramOutlet = this->getAsOutlet();
 
                 bool hasConnections = paramOutlet.getNumConnections() > 0;
-                ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), paramOutlet.getPinLabel().c_str(), paramOutlet.outletPosition, getLinkName(paramOutlet.linkType), paramOutlet.linkType, IM_COL32(255,255,255,255), hasConnections, ImGuiExNodePinsFlags_Right );
+                ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), paramOutlet.getPinLabel().c_str(), paramOutlet.outletPosition, getLinkName(paramOutlet.linkType), paramOutlet.linkType, getLinkImguiColor(paramOutlet.linkType), hasConnections, ImGuiExNodePinsFlags_Right );
                 if( pinData ){
                     if( pinData.flag == ImGuiExNodePinActionFlags_ConnectPin ){
                         // get other as inlet
