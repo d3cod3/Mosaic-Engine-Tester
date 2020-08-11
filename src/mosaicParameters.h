@@ -79,6 +79,102 @@ enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
 #define COLOR_SPECIAL           ofColor(255,255,255,255)
 #define COLOR_UNDEFINED         ofColor(0,  0,  0,  255)
 
+// C++ typelist, recursive implementation
+template <typename ... Types>
+struct TypeList {
+    //using myTypes = ;
+};
+
+// Inner type setup
+template <LinkType VP_LINK_TYPE>
+struct ofxVPLinkTypeInfo;
+
+// Static link information (compile-time constructed)
+template <>
+struct ofxVPLinkTypeInfo< VP_LINK_UNDEFINED > {
+public:
+  using allSubTypes = TypeList< void >;
+  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+  static constexpr LinkType linkType = VP_LINK_UNDEFINED;
+  static constexpr char linkName[] = "Undefined";
+  //static constexpr typdef linkDataTypes[] = { int, float };
+  //vector<typedef> test;
+};
+
+template <>
+struct ofxVPLinkTypeInfo< VP_LINK_NUMERIC > {
+public:
+  using allSubTypes = TypeList< int, float >;
+  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+  static constexpr LinkType linkType = VP_LINK_NUMERIC;
+  static constexpr char linkName[] = "Numeric";
+  //static constexpr typdef linkDataTypes[] = { int, float };
+  //vector<typedef> test;
+};
+
+template <>
+struct ofxVPLinkTypeInfo< VP_LINK_STRING > {
+public:
+  using allSubTypes = TypeList< std::string >;
+  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+  static constexpr LinkType linkType = VP_LINK_STRING;
+  static constexpr char linkName[] = "Numeric";
+  //static constexpr typdef linkDataTypes[] = { int, float };
+  //vector<typedef> test;
+};
+
+//template <>
+//struct ofxVPLinkTypeInfo< VP_LINK_ARRAY > {
+//public:
+//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+//  static constexpr LinkType linkType = VP_LINK_ARRAY;
+//  static constexpr char linkName[] = "Numeric";
+//  //static constexpr typdef linkDataTypes[] = { int, float };
+//  //vector<typedef> test;
+//};
+
+//template <>
+//struct ofxVPLinkTypeInfo< VP_LINK_TEXTURE > {
+//public:
+//  using allSubTypes = TypeList< ofTexture >;
+//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+//  static constexpr LinkType linkType = VP_LINK_TEXTURE;
+//  static constexpr char linkName[] = "Numeric";
+//  //static constexpr typdef linkDataTypes[] = { int, float };
+//  //vector<typedef> test;
+//};
+
+//template <>
+//struct ofxVPLinkTypeInfo< VP_LINK_AUDIO > {
+//public:
+//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+//  static constexpr LinkType linkType = VP_LINK_AUDIO;
+//  static constexpr char linkName[] = "Numeric";
+//  //static constexpr typdef linkDataTypes[] = { int, float };
+//  //vector<typedef> test;
+//};
+
+//template <>
+//struct ofxVPLinkTypeInfo< VP_LINK_SPECIAL > {
+//public:
+//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+//  static constexpr LinkType linkType = VP_LINK_SPECIAL;
+//  static constexpr char linkName[] = "Numeric";
+//  //static constexpr typdef linkDataTypes[] = { int, float };
+//  //vector<typedef> test;
+//};
+
+//template <>
+//struct ofxVPLinkTypeInfo< VP_LINK_PIXELS > {
+//public:
+//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
+//  static constexpr LinkType linkType = VP_LINK_PIXELS;
+//  static constexpr char linkName[] = "Numeric";
+//  //static constexpr typdef linkDataTypes[] = { int, float };
+//  //vector<typedef> test;
+//};
+
+
 // Convert enum to string
 inline const char* ToString(const LinkType& v){
     switch (v){
@@ -305,7 +401,6 @@ public:
     const HasInlet<T>& toPinTyped;
 };
 
-
 // - - - - - - - - - -
 class AbstractHasInlet : public HasPin {
 public:
@@ -374,11 +469,12 @@ public:
     AbstractHasOutlet( LinkType _linkType = VP_LINK_UNDEFINED ) : HasPin(_linkType) {};
 
     template<typename MODIFIER_TYPE>
-    MODIFIER_TYPE& getTypedOutlet() {
+    MODIFIER_TYPE& getTypedOutlet() { // Todo : add try in method name, as it can throw
         // Ensure correct usage by allowing only deriveds of AbstractHasOutlet
         static_assert(std::is_base_of<AbstractHasOutlet, MODIFIER_TYPE>::value, "MODIFIER_TYPE should inherit from AbstractHasOutlet* !!!");
 
         try {
+            // Try get native type
             MODIFIER_TYPE* typedOutlet = dynamic_cast<MODIFIER_TYPE*>(this);
             if( !typedOutlet || typedOutlet==nullptr ){
                 throw 888; // todo: throw VPError
@@ -386,7 +482,7 @@ public:
             return *typedOutlet;
         } catch (...) {
             std::cout << "Catched WRONG TYPE CONVERSION! (normal behaviour)" << std::endl;
-            throw 777; // todo: throw VPError
+            throw 777; // todo: re-throw VPError
         }
     };
 
@@ -443,6 +539,7 @@ public:
         return false;
     };
 
+    // Note: called after onPinConnected() (is this the wished behaviour?)
     bool unRegisterPinLink(PinLink<OUTPUT_TYPE>& _link){
         // check
         if( (AbstractHasOutlet*) _link.fromPin == (AbstractHasOutlet*) this ){
@@ -462,12 +559,11 @@ public:
             int i = 0;
             for(auto it=connectedPinLinks.cbegin(); it!=connectedPinLinks.cend(); it++){
                 if(i==_index){
-                    PinLink<OUTPUT_TYPE>*const ret = *it;
+                    //PinLink<OUTPUT_TYPE>*const ret = *it;
                     return **it;// static_cast<const AbstractPinLink&>(**it);
                 }
                 i++;
             }
-
         }
 
         throw VPError(VPErrorCode_LINK, VPErrorStatus_NOTICE, "This index doesn't exist in the connected links list.");
@@ -1107,11 +1203,13 @@ protected:
                 for(int i=0; i < outlet.getNumConnections(); i++){
                     try {
                         AbstractPinLink& pl = outlet.tryGetPinLink(i);
+                        ImGui::PushID(i);
                         ImGui::Text("Outlet %i = %s (%s)", i, pl.toPin.getPinLabel().c_str(), getLinkName(pl.toPin.linkType) );
                         ImGui::SameLine();
                         if( ImGui::SmallButton("Disconnect") ){
                             pl.toPin.disconnectPin();
                         }
+                        ImGui::PopID();
                     }
                     catch(...){
                         ImGui::Text("Inlet %i", i);
@@ -1217,6 +1315,7 @@ public:
         return this->AbstractHasInlet::linkType == _linktype;
         // todo : make this work for similar link types ? ( ex: int/float/double = numeric)
     };
+    // This function is for checking an instance on runtime, prevents connecting to self
     virtual bool acceptsOutletInstance( HasOutlet<MODIFIER_TYPE>& _outletInstance ) const override {
         // todo: also check if _outletInstance == [the HasOutlet eventually associated with the inlet via the parameter]
         return &_outletInstance.getOutputValue() != abstractParamModifier::parent.underlyingValueAddr;
@@ -1238,6 +1337,8 @@ public:
         try {
             myLink.fromPinTyped = &_outlet.getTypedOutlet< HasOutlet<MODIFIER_TYPE> >();
             myLink.fromPin = static_cast<AbstractHasOutlet*>(myLink.fromPinTyped);
+            // throw if ptr didn't cast, should never happen.
+            if(myLink.fromPin == nullptr) throw 999;
         } catch(...){
             myLink.isConnected = false;
             myLink.fromPinTyped = nullptr;
@@ -1291,6 +1392,7 @@ public:
 
             return true;
         }
+        // already disconnected
         return true;
     }
     virtual void onPinConnected() override {

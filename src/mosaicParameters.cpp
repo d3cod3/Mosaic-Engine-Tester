@@ -4,11 +4,11 @@
 // Initialise static members
 std::vector<AbstractParameter*> AbstractParameter::allParams = std::vector<AbstractParameter*>();
 
-template<> LinkType& getLinkType<long double>() { static LinkType link_double = VP_LINK_NUMERIC; return link_double; };
-template<> LinkType& getLinkType<float>() { static LinkType link_float = VP_LINK_NUMERIC; return link_float; };
-template<> LinkType& getLinkType<int>() { static LinkType link_int = VP_LINK_NUMERIC; return link_int; };
-template<> LinkType& getLinkType<std::string>() { static LinkType link_string = VP_LINK_STRING; return link_string; };
-template<> LinkType& getLinkType<char[]>() { static LinkType link_char = VP_LINK_STRING; return link_char; };
+template<> LinkType& getLinkType<long double>() {   static LinkType link_double = VP_LINK_NUMERIC;  return link_double; };
+template<> LinkType& getLinkType<float      >() {   static LinkType link_float = VP_LINK_NUMERIC;   return link_float;  };
+template<> LinkType& getLinkType<int        >() {   static LinkType link_int = VP_LINK_NUMERIC;     return link_int;    };
+template<> LinkType& getLinkType<std::string>() {   static LinkType link_string = VP_LINK_STRING;   return link_string; };
+template<> LinkType& getLinkType<char[]     >() {   static LinkType link_char = VP_LINK_STRING;     return link_char;   };
 //template<> LinkType getLinkType<array>() { return VP_LINK_ARRAY; };
 //template<> LinkType getLinkType<ofTexture>() { return VP_LINK_TEXTURE; };
 //template<> LinkType getLinkType<ofSoundBuffer>() { return VP_LINK_SPECIAL; };
