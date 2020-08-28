@@ -1,30 +1,51 @@
 #include "mosaicParameters.h"
-#include<string>
+#include <string>
+#include <initializer_list>
 
 // Initialise static members
 std::vector<AbstractParameter*> AbstractParameter::allParams = std::vector<AbstractParameter*>();
 
-template<> LinkType& getLinkType<long double>() {   static LinkType link_double = VP_LINK_NUMERIC;  return link_double; };
-template<> LinkType& getLinkType<float      >() {   static LinkType link_float = VP_LINK_NUMERIC;   return link_float;  };
-template<> LinkType& getLinkType<int        >() {   static LinkType link_int = VP_LINK_NUMERIC;     return link_int;    };
-template<> LinkType& getLinkType<std::string>() {   static LinkType link_string = VP_LINK_STRING;   return link_string; };
-template<> LinkType& getLinkType<char[]     >() {   static LinkType link_char = VP_LINK_STRING;     return link_char;   };
+//template<> LinkType& getLinkType<long double>() {   static LinkType link_double = VP_LINK_NUMERIC;  return link_double; };
+//template<> LinkType& getLinkType<float      >() {   static LinkType link_float = VP_LINK_NUMERIC;   return link_float;  };
+//template<> LinkType& getLinkType<int        >() {   static LinkType link_int = VP_LINK_NUMERIC;     return link_int;    };
+//template<> LinkType& getLinkType<std::string>() {   static LinkType link_string = VP_LINK_STRING;   return link_string; };
+//template<> LinkType& getLinkType<char[]     >() {   static LinkType link_char = VP_LINK_STRING;     return link_char;   };
 //template<> LinkType getLinkType<array>() { return VP_LINK_ARRAY; };
 //template<> LinkType getLinkType<ofTexture>() { return VP_LINK_TEXTURE; };
 //template<> LinkType getLinkType<ofSoundBuffer>() { return VP_LINK_SPECIAL; };
 //template<> LinkType getLinkType<ofAudioBuffer>() { return VP_LINK_AUDIO; };
 //template<> LinkType getLinkType<ofPixels>() { return VP_LINK_PIXELS; };
 
-template<> const char* getLinkName<long double>() { return "VP_LINK_NUMERIC"; };
-template<> const char* getLinkName<float>() { return "VP_LINK_NUMERIC"; };
-template<> const char* getLinkName<int>() { return "VP_LINK_NUMERIC"; };
-template<> const char* getLinkName<std::string>() { return "VP_LINK_STRING"; };
-template<> const char* getLinkName<char[]>() { return "VP_LINK_STRING"; };
+//template<> const char* getLinkName<long double>(long double) { return "VP_LINK_NUMERIC"; };
+//template<> const char* getLinkName<float>(float) { return "VP_LINK_NUMERIC"; };
+//template<> const char* getLinkName<int>(int) { return "VP_LINK_NUMERIC"; };
+//template<> const char* getLinkName<std::string>(std::string) { return "VP_LINK_STRING"; };
+//template<> const char* getLinkName<char[]>(char[]) { return "VP_LINK_STRING"; };
 
 std::ostream& operator << (std::ostream& _out, const VPError& _e){
     _out << "VPError=[" << _e.code << "/" << _e.status << "] " << _e.message << std::endl;
     return _out;
-}
+};
+
+// Set / Declare all linktype data on compile time.
+// Note: static constexpr variables need to be defined in the header, AND declared in the .cpp
+#define DECLARE_COLOR_FOR(LINKTYPE) constexpr const unsigned char ofxVPLinkTypeInfo< LINKTYPE >::color[4];
+#define DEFINE_OFCOLOR_FOR(LINKTYPE) const ofColor ofxVPLinkTypeInfo< LINKTYPE >::ofColour = { ofxVPLinkTypeInfo<LINKTYPE>::color[0], ofxVPLinkTypeInfo<LINKTYPE>::color[1], ofxVPLinkTypeInfo<LINKTYPE>::color[2], ofxVPLinkTypeInfo<LINKTYPE>::color[3] };
+#define DECLARE_IMCOLOR_FOR(LINKTYPE) constexpr const ImU32 ofxVPLinkTypeInfo< LINKTYPE >::imguiColor;// = IM_COL32( ofxVPLinkTypeInfo< LINKTYPE >::color[0],ofxVPLinkTypeInfo< LINKTYPE >::color[1], ofxVPLinkTypeInfo< LINKTYPE >::color[2], ofxVPLinkTypeInfo< LINKTYPE >::color[3] );
+#define DECLARE_LINKNAME_FOR(LINKTYPE) constexpr const char ofxVPLinkTypeInfo< LINKTYPE >::linkName[];
+#define DECLARE_LINKTYPE_FOR(LINKTYPE) constexpr const LinkType ofxVPLinkTypeInfo< LINKTYPE >::linkTyyype;
+#define SET_VARIABLES_FOR(LINKTYPE) DECLARE_COLOR_FOR(LINKTYPE) DEFINE_OFCOLOR_FOR(LINKTYPE) DECLARE_IMCOLOR_FOR(LINKTYPE) DECLARE_LINKNAME_FOR(LINKTYPE) DECLARE_LINKTYPE_FOR(LINKTYPE)
+
+SET_VARIABLES_FOR( VP_LINK_UNDEFINED );
+SET_VARIABLES_FOR( VP_LINK_NUMERIC );
+SET_VARIABLES_FOR( VP_LINK_STRING );
+SET_VARIABLES_FOR( VP_LINK_ARRAY );
+SET_VARIABLES_FOR( VP_LINK_TEXTURE );
+SET_VARIABLES_FOR( VP_LINK_AUDIO );
+SET_VARIABLES_FOR( VP_LINK_SPECIAL );
+SET_VARIABLES_FOR( VP_LINK_PIXELS );
+
+//ofxVPLinkTypeInfo<VP_LINK_UNDEFINED>::allSubTypesTest myThing;
 
 // - - - - - - - - - -
 // TYPE some parameters

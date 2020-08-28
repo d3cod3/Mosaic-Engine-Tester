@@ -66,8 +66,8 @@
 # define IMGUI_EX_NODE_FOOTER_HANDLE_SIZE 16
 # define IMGUI_EX_NODE_CONTENT_PADDING 4
 # define IMGUI_EX_NODE_PINS_WIDTH_SMALL 10
-# define IMGUI_EX_NODE_PINS_WIDTH_NORMAL 20
-# define IMGUI_EX_NODE_PINS_WIDTH_LARGE 50
+# define IMGUI_EX_NODE_PINS_WIDTH_NORMAL 15
+# define IMGUI_EX_NODE_PINS_WIDTH_LARGE 30
 # define IMGUI_EX_NODE_PIN_WIDTH 8
 # define IMGUI_EX_NODE_PIN_WIDTH_HOVERED 12
 # define IMGUI_EX_NODE_HOVER_DISTANCE 7
@@ -83,6 +83,10 @@ static ImVec4 Darken (ImVec4 c, float p){ return ImVec4(fmax(0.f, c.x - 1.0f * p
 static ImVec4 Lighten(ImVec4 c, float p){ return ImVec4(fmax(0.f, c.x + 1.0f * p), fmax(0.f, c.y + 1.0f * p), fmax(0.f, c.z + 1.0f *p), c.w); }
 static ImU32  Darken (const ImU32&  c, float p){ return ImGui::ColorConvertFloat4ToU32( Darken (ImColor(c).Value, p) );};
 static ImU32  Lighten(const ImU32&  c, float p){ return ImGui::ColorConvertFloat4ToU32( Lighten(ImColor(c).Value, p) );};
+inline void setColorTransparency(ImU32& _col, const unsigned int& _transparency ){
+    _col &= ~IM_COL32_A_MASK; // Set alpha to 0
+    _col |= (((ImU32)_transparency) << IM_COL32_A_SHIFT); // Add alpha to color
+}
 
 // Indicates which menu action has triggered, if any.
 typedef int ImGuiExNodeMenuActionFlags;
@@ -169,17 +173,17 @@ struct NodeCanvasView {
 
 // Layout for pins data
 struct PinLayout {
-    ImRect region;
-    ImVec2 curDrawPos;
-    unsigned int numPins = 0;
-    ImVec2 pinSpace;
+    ImRect region;              // Containing zone for all pins
+    mutable ImVec2 curDrawPos;  // Cursor location
+    unsigned int numPins = 0;   // Number of pins to dispatch in the zone
+    ImVec2 pinSpace;            // Size of 1 pin within the region.
 
     PinLayout() = default;
     PinLayout( const ImVec2& _posMin, const ImVec2& _posMax, const int _numPins=0 ) :
         region(_posMin, _posMax),
         curDrawPos( _posMin ),
         numPins( _numPins ),
-        pinSpace( (numPins > 0) ? ImVec2(region.GetSize() / ImVec2(numPins,numPins)) : ImVec2(0,0) )
+        pinSpace( (numPins > 0) ? ImVec2( (region.GetSize() / ImVec2(1,numPins)) ) : ImVec2(0,0) )
         {}
 };
 

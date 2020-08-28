@@ -429,7 +429,7 @@ int mosaicNode::getNumInlets(){
     return numInlets;
 }
 int mosaicNode::getNumOutlets(){
-    return numOutlets;
+    return numOutlets;//parameters.size() + myDynamicParams.size();// numOutlets;
 }
 int mosaicNode::getIsResizable(){
     return true;

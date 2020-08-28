@@ -266,7 +266,7 @@ bool ImGuiEx::NodeCanvas::BeginNode( const char* _id, std::string _name, ImVec2&
     IM_ASSERT(canDrawNode == true); // Don't call if Begin() returned false
     IM_ASSERT(isDrawingNode == false); // Finish your previous node before staring a new one !
 
-    // Precalc some vars
+    // Precalc some vars, valid until EndNode() is called
     ImVec2 nodeScale = ImVec2(1,1)*canvasView.scale;
     curNodeData = NodeLayoutData(canvasView.translation + _pos*nodeScale, _size*nodeScale, canvasView.scale );
     isDrawingNode = true; // to allow End() call
@@ -276,7 +276,7 @@ bool ImGuiEx::NodeCanvas::BeginNode( const char* _id, std::string _name, ImVec2&
     bool isNodeVisible = ImGui::IsRectVisible( curNodeData.outerContentBox.Min, curNodeData.outerContentBox.Max );
     if( !isNodeVisible ){
         curNodeData.zoomName = ImGuiExNodeZoom_Invisible;
-        return false;
+        return false; // Todo: don't return early so pin locations update when the emitting box is invisible.
     }
 
     // Calc zoom name
@@ -291,25 +291,25 @@ bool ImGuiEx::NodeCanvas::BeginNode( const char* _id, std::string _name, ImVec2&
         else
             curNodeData.zoomName = ImGuiExNodeZoom_Large;
     }
-    curNodeData.viewName = ImGuiExNodeView_None;
+    //curNodeData.viewName = ImGuiExNodeView_None;
 
-    // Adapt the layout for pins
+    // Adapt the pin space to the layout
+    // Backup, to set various pin sizes depending on the zoom level
     int pinsWidth = 0;
-    /*if(curNodeData.zoomName == ImGuiExNodeZoom_Imploded){
-        // Behaviour: if there are any pins, show only pins. Else imploded still have small content.
-        pinsWidth = 0;
-        if(_numLeftPins > 0 || _numLeftPins > 0)
-            pinsWidth = ImFloor(curNodeData.innerContentBox.GetSize().x);
-        if(_numLeftPins > 0 && _numLeftPins > 0)
-            pinsWidth *= .5f;
-    }
-    else{
-        pinsWidth = (curNodeData.zoomName >= ImGuiExNodeZoom_Large) ? IMGUI_EX_NODE_PINS_WIDTH_LARGE : (curNodeData.zoomName >= ImGuiExNodeZoom_Normal) ? IMGUI_EX_NODE_PINS_WIDTH_NORMAL : IMGUI_EX_NODE_PINS_WIDTH_SMALL;
-    }*/
+//    if(curNodeData.zoomName == ImGuiExNodeZoom_Imploded){
+//        // Behaviour: if there are any pins, show only pins. Else imploded still have small content.
+//        pinsWidth = 0;
+// //        if(_numLeftPins > 0 || _numLeftPins > 0)
+// //            pinsWidth = ImFloor(curNodeData.innerContentBox.GetSize().x);
+// //        if(_numLeftPins > 0 && _numLeftPins > 0)
+// //            pinsWidth *= .5f;
+//    }
+//    else{
+//        //pinsWidth = (curNodeData.zoomName >= ImGuiExNodeZoom_Large) ? IMGUI_EX_NODE_PINS_WIDTH_LARGE : (curNodeData.zoomName >= ImGuiExNodeZoom_Normal) ? IMGUI_EX_NODE_PINS_WIDTH_NORMAL : IMGUI_EX_NODE_PINS_WIDTH_SMALL;
+//        pinsWidth = (curNodeData.zoomName >= ImGuiExNodeZoom_Large) ? IMGUI_EX_NODE_PINS_WIDTH_LARGE : (curNodeData.zoomName >= ImGuiExNodeZoom_Normal) ? IMGUI_EX_NODE_PINS_WIDTH_NORMAL : IMGUI_EX_NODE_PINS_WIDTH_SMALL;
+//    }
 
-
-
-    // Remove pins space from innerContentBox
+    // Remove pins space from innerContentBox if there are any pins
     if( _numLeftPins > 0 ){ // Has left pins
         pinsWidth = IMGUI_EX_NODE_PINS_WIDTH_NORMAL;
         curNodeData.pinsFlags |= ImGuiExNodePinsFlags_Left;
@@ -337,11 +337,12 @@ bool ImGuiEx::NodeCanvas::BeginNode( const char* _id, std::string _name, ImVec2&
     fg->AddRect(curNodeData.rightPins.region.Min, curNodeData.rightPins.region.Max, IM_COL32(255,255,255,200));
     fg->AddRect(curNodeData.leftPins.region.Min, curNodeData.leftPins.region.Max, IM_COL32(255,255,255,200));
     fg->AddRect(curNodeData.innerContentBox.Min, curNodeData.innerContentBox.Max, IM_COL32(255,255,255,200));
-    fg->AddRect(curNodeData.innerContentBox.Min, curNodeData.innerContentBox.Max, IM_COL32(255,255,255,200));
+    //fg->AddRect(curNodeData.innerContentBox.Min, curNodeData.innerContentBox.Max, IM_COL32(255,255,255,200));
     fg->AddRect(curNodeData.outerContentBox.Min, curNodeData.outerContentBox.Max, IM_COL32(255,255,255,200));
     fg->AddRect(curNodeData.outerContentBox.Min, ImVec2(curNodeData.outerContentBox.Max.x,curNodeData.outerContentBox.Min.y+IMGUI_EX_NODE_HEADER_HEIGHT), IM_COL32(255,255,255,200));
     fg->AddRect(ImVec2(curNodeData.outerContentBox.Min.x, curNodeData.outerContentBox.Max.y-IMGUI_EX_NODE_FOOTER_HEIGHT), curNodeData.outerContentBox.Max, IM_COL32(255,255,255,200));
 #endif
+
     // Create node window
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));//IMGUI_EX_NODE_CONTENT_PADDING,IMGUI_EX_NODE_CONTENT_PADDING));
     ImGui::SetNextWindowPos(curNodeData.outerContentBox.Min);
@@ -973,8 +974,9 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
             ImGui::SetCursorScreenPos( pinLayout.curDrawPos + ImVec2( -pinLayout.pinSpace.x, 0)  );
         }
 
+        // Note: ImMax below is used because buttons fail with 0 size.
 # if __IMGUI_EX_NODECANVAS_DEBUG__
-        ImGui::Button( (_pinFlag==ImGuiExNodePinsFlags_Left)?"##inletBtnLeft":"##inletBtnRight", ImMax(ImVec2(pinLayout.pinSpace.x,pinLayout.pinSpace.y*.8f), ImVec2(1,1)));//pinLayout.pinSpace);
+        ImGui::Button( (_pinFlag==ImGuiExNodePinsFlags_Left)?"##inletBtnLeft":"##inletBtnRight", ImMax(ImVec2(pinLayout.pinSpace.x,pinLayout.pinSpace.y), ImVec2(1,1)));//pinLayout.pinSpace);
 # else
         ImGui::InvisibleButton( (_pinFlag==ImGuiExNodePinsFlags_Left)?"##inletBtnLeft":"##inletBtnRight", ImMax(ImVec2(pinLayout.pinSpace.x,pinLayout.pinSpace.y*.8f), ImVec2(1,1)));
 # endif
@@ -993,7 +995,7 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
                 payloadTitle.append( std::to_string(_linkTypeId) );
                 // Set payload to carry the _dragDropData, usually a uniqueID (could be anything)
                 ImGui::SetDragDropPayload( payloadTitle.c_str(), (std::string::value_type*)_dragDropData, sizeof(std::string::value_type*)*strlen(_dragDropData), ImGuiCond_Always);
-                std::cout << "Sending PAYLOAD = " << payloadTitle << " from pin " << _dragDropData << std::endl;
+                //std::cout << "Sending PAYLOAD = " << payloadTitle << " from pin " << _dragDropData << std::endl;
 
                 // Remember that we're dragging
                 activeLinkSourcePinUID = _dragDropData;
@@ -1021,7 +1023,7 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
                 }
                 else {
                     // Update the activeLink information
-                    if(_pinFlag==ImGuiExNodePinsFlags_Left){
+                    if( _pinFlag==ImGuiExNodePinsFlags_Left ){
                         activeLink.fromPinPos = ImGui::GetMousePos();
                     }
                     else {
@@ -1029,10 +1031,10 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
                     }
 
                     // Draw dragging link
-                    auto connectingColor = ImGui::ColorConvertU32ToFloat4(activeLink.linkColor);
-                    connectingColor.w = 0.4f;
+                    auto connectingColor = activeLink.linkColor;//ImGui::ColorConvertU32ToFloat4(activeLink.linkColor);
+                    setColorTransparency(connectingColor, 128);//connectingColor.w = 0.4f;
                     const LinkBezierData link_data = get_link_renderable( activeLink.fromPinPos, activeLink.toPinPos,IMGUI_EX_NODE_LINK_LINE_SEGMENTS_PER_LENGTH);
-                    ImGui::GetForegroundDrawList()->AddBezierCurve(link_data.bezier.p0,link_data.bezier.p1,link_data.bezier.p2,link_data.bezier.p3,ImGui::ColorConvertFloat4ToU32(connectingColor),IMGUI_EX_NODE_LINK_THICKNESS,link_data.num_segments);
+                    ImGui::GetForegroundDrawList()->AddBezierCurve(link_data.bezier.p0,link_data.bezier.p1,link_data.bezier.p2,link_data.bezier.p3,connectingColor,IMGUI_EX_NODE_LINK_THICKNESS,link_data.num_segments);
 
                     // Draw link info
                     //ImVec2 tempPos = activeLink.fromPinPos - (activeLink.fromPinPos - (activeLink.toPinPos + ImVec2( IMGUI_EX_NODE_PIN_WIDTH * -.5f, pinLayout.pinSpace.y * .5f)))*.5f - ImGui::CalcTextSize(activeLink.linkLabel.c_str())*.5f; // Use this to place in middle of cable
@@ -1048,8 +1050,9 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
 
             ImGui::EndDragDropSource();
         }
+        // Check if the drag handle was dropped
         else if( activeLinkSourcePinUID == _dragDropData ){
-            // Reset (drag handle dropped)
+            // Reset
             if(!ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !ImGui::IsDragDropPayloadBeingAccepted() ){
                 // Don't reset this at the end of dragging, or it will erase before the other gets it
                 activeLinkSourcePinUID = "";
@@ -1138,47 +1141,72 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
         }
     }
 
-    // Set position of pin so user can draw it.
+    // Update the pin position so it draws at the correct location
     //float pinSpace = (ImGui::IsItemHovered()) ? IMGUI_EX_NODE_PIN_WIDTH_HOVERED : IMGUI_EX_NODE_PIN_WIDTH;
-    float pinSpace = IMGUI_EX_NODE_PIN_WIDTH;
+    //float pinSpace = IMGUI_EX_NODE_PIN_WIDTH;
 
     // Send pin location to parent
     _pinPosition = (_pinFlag==ImGuiExNodePinsFlags_Left) ?
-                pinLayout.curDrawPos + ImVec2( pinLayout.pinSpace.x * +.5f - IMGUI_EX_NODE_PIN_WIDTH * .5f, pinLayout.pinSpace.y * .5f):
-                pinLayout.curDrawPos + ImVec2( pinLayout.pinSpace.x * -.5f /*- IMGUI_EX_NODE_PIN_WIDTH * .5f*/, pinLayout.pinSpace.y * .5f);
-
+                // PREV DRAW POS.END           ( MOVE the CENTER OF PIN ZONE   ) + ( CENTER OF PIN ZONE        )  ( CENTER OF PIN ZONE         )
+                pinLayout.curDrawPos + ImVec2( (IMGUI_EX_NODE_PIN_WIDTH * +.0f ) + (pinLayout.pinSpace.x * +.5f), ( pinLayout.pinSpace.y * .5f )):
+                pinLayout.curDrawPos + ImVec2( (IMGUI_EX_NODE_PIN_WIDTH * -.0f ) + (pinLayout.pinSpace.x * -.5f), ( pinLayout.pinSpace.y * .5f ));
 
     // Draw target connection info label (pin being drag-hovered with an acceptable type)
-    if( ImGui::IsItemHovered() || (pinIsBeingDragHovered && isDragAcceptable) ){ // any hover = draw label
+    if( pinIsBeingDragHovered && isDragAcceptable ){
         ImVec2 labelTextSize = ImGui::CalcTextSize( _pinLabel );
-        if(_pinFlag==ImGuiExNodePinsFlags_Left){
 
-        }
-        ImVec2 labelPos = ImVec2(
+        // Text is aligned inside the node, for a more intuitive data-flow direction presentation
+        ImVec2 labelTextPos = ImVec2(
+            // X coords
             (_pinFlag==ImGuiExNodePinsFlags_Left) ?
-                        pinLayout.region.Max.x/* - labelTextSize.x */ + IMGUI_EX_NODE_PIN_WIDTH*.5f :
-                        pinLayout.region.Min.x - labelTextSize.x - IMGUI_EX_NODE_PIN_WIDTH*.5f,
-            pinLayout.curDrawPos.y + (pinLayout.pinSpace.y * .5f) - (labelTextSize.y*0.5f)/* - IMGUI_EX_NODE_PIN_WIDTH*.5f*/
+                    pinLayout.region.Max.x /*- labelTextSize.x*/  + IMGUI_EX_NODE_PIN_WIDTH : // LEFT PINS X
+                    pinLayout.region.Min.x - labelTextSize.x - IMGUI_EX_NODE_PIN_WIDTH // RIGHT PINS X
+            // Y Coords
+            ,pinLayout.curDrawPos.y + (pinLayout.pinSpace.y * .5f) - (labelTextSize.y*0.5f)/* - IMGUI_EX_NODE_PIN_WIDTH*.5f*/
         );
 
-        ImGui::GetForegroundDrawList()->AddRectFilled( labelPos + ImVec2( - pinLayout.pinSpace.x - (IMGUI_EX_NODE_PIN_WIDTH*((_pinFlag==ImGuiExNodePinsFlags_Left) ?.5f:-.5f)),-IMGUI_EX_NODE_PIN_WIDTH), labelPos + labelTextSize + ImVec2(IMGUI_EX_NODE_PIN_WIDTH*((_pinFlag==ImGuiExNodePinsFlags_Left) ?1.f:1.5f),IMGUI_EX_NODE_PIN_WIDTH), IM_COL32(40,40,40,180) );
-        ImGui::GetForegroundDrawList()->AddText( labelPos /*+ ImVec2(IMGUI_EX_NODE_PIN_WIDTH,0)*/ , _pinColor, _pinLabel );
+        ImGui::GetForegroundDrawList()->AddRectFilled( labelTextPos + ImVec2( /*- pinLayout.pinSpace.x*/ - (IMGUI_EX_NODE_PIN_WIDTH),-IMGUI_EX_NODE_PIN_WIDTH), labelTextPos + labelTextSize + ImVec2(IMGUI_EX_NODE_PIN_WIDTH,IMGUI_EX_NODE_PIN_WIDTH), IM_COL32(40,40,40,180) );
+        ImGui::GetForegroundDrawList()->AddText( labelTextPos /*+ ImVec2(IMGUI_EX_NODE_PIN_WIDTH,0)*/ , _pinColor, _pinLabel );
+    }
+    // Draw target connection info label (else, any hover = draw label)
+    else if( ImGui::IsItemHovered() ){ // any hover = draw label
+        ImVec2 labelTextSize = ImGui::CalcTextSize( _pinLabel );
+
+        // Text is aligned outside the node, not to mess up with the node content zone
+        ImVec2 labelTextPos = ImVec2(
+            // X coords
+            (_pinFlag==ImGuiExNodePinsFlags_Left) ?
+            //      STARTING BOUNDARY         TEXT WIDTH        TEXT MARGIN
+                    pinLayout.region.Min.x  - labelTextSize.x   - IMGUI_EX_NODE_PIN_WIDTH : // LEFT PINS X
+                    pinLayout.region.Max.x/* - labelTextSize.x*/ + IMGUI_EX_NODE_PIN_WIDTH // RIGHT PINS X
+            // Y Coords
+            ,pinLayout.curDrawPos.y + (pinLayout.pinSpace.y * .5f) - (labelTextSize.y*0.5f)/* - IMGUI_EX_NODE_PIN_WIDTH*.5f*/
+        );
+
+        ImGui::GetForegroundDrawList()->AddRectFilled(
+                    // Min
+                    labelTextPos + ImVec2( -IMGUI_EX_NODE_PIN_WIDTH, -IMGUI_EX_NODE_PIN_WIDTH),
+                    // Max
+                    labelTextPos + labelTextSize + ImVec2(IMGUI_EX_NODE_PIN_WIDTH,IMGUI_EX_NODE_PIN_WIDTH),
+                    IM_COL32(40,40,40,180)
+        );
+        ImGui::GetForegroundDrawList()->AddText( labelTextPos /*+ ImVec2(IMGUI_EX_NODE_PIN_WIDTH,0)*/ , _pinColor, _pinLabel );
     }
 
     // Draw pin
     if( pinIsBeingDragHovered && !isDragAcceptable ){ // Uncompatible hover appearance
-        ImGui::GetForegroundDrawList()->AddCircleFilled( _pinPosition, pinSpace * .6f, IM_COL32(255,0,0,200), 6);//IM_COL32(126,126,126,200), 6);
+        ImGui::GetForegroundDrawList()->AddCircleFilled( _pinPosition, IMGUI_EX_NODE_PIN_WIDTH * .6f, IM_COL32(255,0,0,200), 6);//IM_COL32(126,126,126,200), 6);
     }
     else if( pinIsBeingDragged || pinIsBeingDragHovered || ImGui::IsItemHovered() ){ // Dragging or compatible hover appearance
-        ImGui::GetForegroundDrawList()->AddCircleFilled( _pinPosition, pinSpace * .5f, _pinColor, 6);
-        ImGui::GetForegroundDrawList()->AddCircle( _pinPosition, pinSpace * (ImGui::IsItemHovered()?.9f:1.f), _pinColor, 6);
+        ImGui::GetForegroundDrawList()->AddCircleFilled( _pinPosition, IMGUI_EX_NODE_PIN_WIDTH * .5f, _pinColor, 6);
+        ImGui::GetForegroundDrawList()->AddCircle( _pinPosition, IMGUI_EX_NODE_PIN_WIDTH * (ImGui::IsItemHovered()?.9f:1.f), _pinColor, 6);
     }
     else {
         // default appearance
-        nodeDrawList->AddCircleFilled( _pinPosition, pinSpace * .5f, _pinColor, 6);
+        nodeDrawList->AddCircleFilled( _pinPosition, IMGUI_EX_NODE_PIN_WIDTH * .5f, _pinColor, 6);
         // Extra connected appearance
         if( _pinIsConnected ){
-            nodeDrawList->AddCircle( _pinPosition, pinSpace * 0.9f, _pinColor, 6);
+            nodeDrawList->AddCircle( _pinPosition, IMGUI_EX_NODE_PIN_WIDTH * 0.9f, _pinColor, 6);
         }
     }
 

@@ -58,8 +58,8 @@
 // Define link types.
 // Todo: make this a factory.
 // all possible links
-enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
-    VP_LINK_UNDEFINED   = 777, // NULLPTR / UNDEFINED_TYPE equivalence ??
+enum LinkType : unsigned char { // unsigned char has a smaller footprint
+    VP_LINK_UNDEFINED   = 255, // NULLPTR / UNDEFINED_TYPE equivalence ??
     VP_LINK_NUMERIC     = 0,
     VP_LINK_STRING      = 1,
     VP_LINK_ARRAY       = 2,
@@ -69,6 +69,104 @@ enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
     VP_LINK_PIXELS      = 6,
 };
 
+template<typename ENUM, typename KEY_TYPE, ENUM ...INDEXES >
+struct EnumIterator {
+public:
+    constexpr EnumIterator() = default;
+    ~EnumIterator() = default;
+
+    using Enum_t = ENUM;
+    using Value_t = KEY_TYPE;
+
+    static constexpr const std::size_t numKeys = { sizeof...(INDEXES) };
+    static constexpr const Enum_t keys[sizeof...(INDEXES)] = { INDEXES... };
+//    static constexpr const std::array<const Enum_t, sizeof...(INDEXES) > keys = {
+//        {INDEXES...}
+//    };
+
+    // Iterator support
+    static constexpr const Enum_t& begin() noexcept { return keys[0]; };
+    static constexpr const Enum_t& end() noexcept { return keys[numKeys-1]; };
+    // pointer begin() & end()
+    static constexpr const Enum_t* const pBegin() noexcept { return &keys[0]; };
+    static constexpr const Enum_t* const pEnd() noexcept { return (&keys[numKeys-1]+1); };
+
+//	constexpr explicit EnumValue(const EnumValue &) = default;
+//	constexpr EnumValue &operator=(const EnumValue &) = default;
+//
+//	constexpr operator TYPE() const {return value_;}
+//	constexpr TYPE value() const {return value_;}
+    // Give implicit direct access to underlying data
+    //constexpr const operator KEY_TYPE() const {return keys;}
+    //constexpr Enum value() const { return keys; }
+//	constexpr const Enum operator ++( const Enum _value){
+//		return keys[keys.find(_value)];
+//	}
+
+    // ValueType to Enum type (constrain to possible values)
+    static constexpr const Enum_t& getEnumFromKeyType( const Value_t& _value ) {
+        // If key exists, return key. Else return not found value (pEnd())
+        return (Enum_t)((static_cast<const Value_t>(static_cast<const Enum_t>(_value)) == _value)? _value : *keys.pEnd() );
+    }
+    // Allows getting the enum value by index
+    static constexpr const Enum_t& getEnumByIndex( const std::size_t& _index ) {
+        return keys[ _index ];
+    }
+    // Returns the index of a given Enum
+    static constexpr std::size_t getIndexOfEnum( const Enum_t& _enum ) {
+        return std::distance(&keys[0], std::find(&keys[0], &keys[numKeys-1], _enum)) < numKeys ? std::distance(&keys[0], std::find(&keys[0], &keys[numKeys-1], _enum)) : -1;
+    }
+
+    // Array access
+    inline constexpr const Enum_t& operator [](const std::size_t& _index) const { // index-based access
+        //return (Enum) keys[ _index % (numKeys-1)];
+        return getEnumByIndex(_index);
+    }
+    // Char operator, constrain to closest valid value
+    inline constexpr const Enum_t& operator [](const Value_t& _value) const {
+        return getEnumFromChar(_value);
+    }
+};
+template<typename ENUM, typename KEY_TYPE, ENUM ...INDEXES >
+constexpr const ENUM EnumIterator<ENUM, KEY_TYPE, INDEXES...>::keys[]; // has to be declared too !
+//constexpr const std::array<const ENUM, sizeof...(INDEXES)> EnumIterator<ENUM, KEY_TYPE, INDEXES...>::keys;
+
+// LinkType iterator utility
+//static constexpr const EnumIterator<LinkType, unsigned char, LinkType::VP_LINK_UNDEFINED, LinkType::VP_LINK_NUMERIC, LinkType::VP_LINK_STRING, LinkType::VP_LINK_ARRAY, LinkType::VP_LINK_TEXTURE, LinkType::VP_LINK_PIXELS, LinkType::VP_LINK_AUDIO, LinkType::VP_LINK_SPECIAL> LinkTypeIterator;
+//using LinkTypeIterator = EnumIterator<LinkType, unsigned char, LinkType::VP_LINK_UNDEFINED, LinkType::VP_LINK_NUMERIC, LinkType::VP_LINK_STRING, LinkType::VP_LINK_ARRAY, LinkType::VP_LINK_TEXTURE, LinkType::VP_LINK_PIXELS, LinkType::VP_LINK_AUDIO, LinkType::VP_LINK_SPECIAL>;
+#define DEFINE_ENUM_ITERATOR(NAME, ENUM, TYPE, VALUES...)\
+    using NAME = EnumIterator<ENUM, TYPE , VALUES >;\
+    inline ENUM operator++(ENUM& c, int) { /* post increment operator */ \
+        if(c == *NAME::pEnd()){ /* Feature: loop once pEnd has been reached */ \
+            return NAME::begin();\
+        }\
+        \
+        int found = NAME::getIndexOfEnum(c);\
+        if( found != -1 ){\
+            c = NAME::getEnumByIndex(found+1);\
+            return NAME::getEnumByIndex(found);\
+        }\
+        else{ return NAME::end(); }\
+    }; \
+    inline ENUM operator++(ENUM& c) { /* pre-increment operator */ \
+        if(c == *NAME::pEnd()){ /* Feature: loop once pEnd has been reached */ \
+            return NAME::begin(); \
+        } \
+        \
+        int found = NAME::getIndexOfEnum(c); \
+        if( found != -1 ){ \
+            c = NAME::getEnumByIndex(found+1); \
+            return c; \
+        } \
+        else return NAME::end(); \
+    }; \
+
+// Declare all link types once here
+// Precomposer has access to 1st line, template composer to both.
+#define VP_ALL_LINK_TYPES LinkType::VP_LINK_UNDEFINED, LinkType::VP_LINK_NUMERIC, LinkType::VP_LINK_STRING, LinkType::VP_LINK_ARRAY, LinkType::VP_LINK_TEXTURE, LinkType::VP_LINK_PIXELS, LinkType::VP_LINK_AUDIO, LinkType::VP_LINK_SPECIAL
+DEFINE_ENUM_ITERATOR(LinkTypeIterator, LinkType, unsigned char, VP_ALL_LINK_TYPES);
+
+// Todo: remove these
 #define COLOR_NUMERIC           ofColor(210,210,210,255)
 #define COLOR_STRING            ofColor(200,180,255,255)
 #define COLOR_ARRAY             ofColor(120,255,120,255)
@@ -83,162 +181,187 @@ enum LinkType /*: unsigned char*/ { // unsigned char has a smaller footprint
 template <typename ... Types>
 struct TypeList {
     //using myTypes = ;
+    constexpr TypeList(){};
 };
+
+//static constexpr TypeList<> VPAllLinkDataTypes(); // needed ?
+//static constexpr TypeList<> VPAllLinkTypes();
 
 // Inner type setup
 template <LinkType VP_LINK_TYPE>
 struct ofxVPLinkTypeInfo;
 
+// Data type to link type conversion (This is non-standard in C++14, fallback below)
+// Will be individually overruled by data types
+template<typename DATA_TYPE>
+static constexpr LinkType getLinkTypeFromDataType() {
+    return VP_LINK_UNDEFINED;
+};
+
+// Data type to link name conversion (static)
+template<typename DATA_TYPE>
+inline const char* getLinkNameFromDataType() { // from link type
+    return ofxVPLinkTypeInfo< getLinkTypeFromDataType<DATA_TYPE>() >::linkName;
+};
+
+// Get Link name from type (static)
+template<LinkType LINK_TYPE>
+static constexpr const char* getLinkName(){
+    return ofxVPLinkTypeInfo< LINK_TYPE >::linkName;
+};
+
+// Macro Helper to output 1 line per argument, 1 to 10 args.
+#define ROUTE_DATA_TO_MACRO_10(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,NAME,...) NAME
+#define ROUTE_DATA_TO_MACRO_SIMPLE( VALS... ) ROUTE_DATA_TO_MACRO_10( VALS, DATA_MACRO_10, DATA_MACRO_9, DATA_MACRO_8, DATA_MACRO_7, DATA_MACRO_6, DATA_MACRO_5, DATA_MACRO_4, DATA_MACRO_3, DATA_MACRO_2, DATA_MACRO_1 )
+#define DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1 ) THEMACRO(ARG1, VARIABLE1)
+#define DATA_MACRO_2( THEMACRO, ARG1, VARIABLE1, VARIABLE2) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_1(THEMACRO, ARG1, VARIABLE2)
+#define DATA_MACRO_3( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3)  DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_2( THEMACRO, ARG1, VARIABLE2, VARIABLE3)
+#define DATA_MACRO_4( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4)  DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_3( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4)
+#define DATA_MACRO_5( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_4( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5)
+#define DATA_MACRO_6( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_5( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6)
+#define DATA_MACRO_7( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_6( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7)
+#define DATA_MACRO_8( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_7( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8)
+#define DATA_MACRO_9( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8, VARIABLE9) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_8( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8, VARIABLE9)
+#define DATA_MACRO_10( THEMACRO, ARG1, VARIABLE1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8, VARIABLE9, VARIABLE10) DATA_MACRO_1( THEMACRO, ARG1, VARIABLE1) DATA_MACRO_9( THEMACRO, ARG1, VARIABLE2, VARIABLE3, VARIABLE4, VARIABLE5, VARIABLE6, VARIABLE7, VARIABLE8, VARIABLE9, VARIABLE10)
+
+// Helper func for the definition below
+#define DECLARE_DATA2LINKTYPE(TYPE, DATA...) ROUTE_DATA_TO_MACRO_SIMPLE( DATA )( DECLARE_DATA2LINKTYPE1, TYPE, DATA )
+#define DECLARE_DATA2LINKTYPE1(TYPE, DATA) \
+    template<> constexpr LinkType getLinkTypeFromDataType< DATA >(){ return TYPE; };
+
 // Static link information (compile-time constructed)
-template <>
-struct ofxVPLinkTypeInfo< VP_LINK_UNDEFINED > {
-public:
-  using allSubTypes = TypeList< void >;
-  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-  static constexpr LinkType linkType = VP_LINK_UNDEFINED;
-  static constexpr char linkName[] = "Undefined";
-  //static constexpr typdef linkDataTypes[] = { int, float };
-  //vector<typedef> test;
+#define VP_REGISTER_LINKTYPE(TYPE, NAME, R, G, B, SUBTYPES...)\
+    template <>\
+    struct ofxVPLinkTypeInfo< TYPE > {\
+    public:\
+      using allSubTypes = TypeList< SUBTYPES >;\
+      static constexpr const unsigned char color[4] = { R,  G,  B, 255 };\
+      static const ofColor ofColour;\
+      /*static inline const ofColor ofColourOldToDelete(){ return ofColor( R, G, B, 255 ); };*/ \
+      static constexpr const ImU32 imguiColor ={ IM_COL32(R,G,B,255) };\
+      static constexpr const LinkType linkTyyype = { TYPE };\
+      static constexpr const char linkName[sizeof(NAME)] = { NAME }; \
+    };\
+    DECLARE_DATA2LINKTYPE(TYPE,SUBTYPES)\
+
+// End Define
+class Special{};// tmp
+//class Data{};// tmp
+VP_REGISTER_LINKTYPE( VP_LINK_UNDEFINED, "Undefined", 0  , 0  , 0,   void           )
+VP_REGISTER_LINKTYPE( VP_LINK_NUMERIC,   "Numeric"  , 210, 210, 210, int, float, double     )
+VP_REGISTER_LINKTYPE( VP_LINK_STRING,    "String"   , 200, 180, 255, std::string    )
+VP_REGISTER_LINKTYPE( VP_LINK_ARRAY,     "Data"     , 120, 255, 120, int[], float[] )
+VP_REGISTER_LINKTYPE( VP_LINK_TEXTURE,   "Texture"  , 120, 255, 255, ofTexture      )
+VP_REGISTER_LINKTYPE( VP_LINK_AUDIO,     "Audio"    , 255, 255, 120, ofSoundBuffer  )
+VP_REGISTER_LINKTYPE( VP_LINK_SPECIAL,   "Special"  , 255, 255, 255, Special        )
+VP_REGISTER_LINKTYPE( VP_LINK_PIXELS,    "Pixels"   , 0  , 180, 140, ofPixels       )
+
+//#define IF_ELSE_SWITCH( CONDITION, STATEMENT, VARIABLES... ) ROUTE_DATA_TO_MACRO_10( VARIABLES, IF_ELSE_SWITCH10, IF_ELSE_SWITCH9, IF_ELSE_SWITCH8, IF_ELSE_SWITCH7, IF_ELSE_SWITCH6, IF_ELSE_SWITCH5, IF_ELSE_SWITCH4, IF_ELSE_SWITCH3, IF_ELSE_SWITCH2, IF_ELSE_SWITCH1 )( CONDITION, STATEMENT, VARIABLES )
+#define IF_ELSE_SWITCH( VARIABLES... ) \
+    ROUTE_DATA_TO_MACRO_SIMPLE( VARIABLES )( IF_ELSE_SWITCH1, NULL, VARIABLES )
+
+// Get link name, dynamic
+inline constexpr const char* getLinkName(const LinkType& _linkType){
+    // C++14 will allow a for-loop in here ?
+    // for( LinkTypeIterator::Value_t linkType : LinkTypeIterator::keys){
+    //    if( _linkType==linkType ) return ofxVPLinkTypeInfo<linkType   >::linkName;
+    // }
+    //ofxVPLinkTypeInfo
+    //return ofxVPLinkTypeInfo< VP_LINK_UNDEFINED >::linkName;
+    return
+            // Compiles to multiple lines like :
+            // _linkType == VP_LINK_NUMERIC ?  ofxVPLinkTypeInfo<VP_LINK_NUMERIC   >::linkName :
+#define IF_ELSE_SWITCH1(ARG1, VARIABLE1) \
+            _linkType == VARIABLE1 ? ofxVPLinkTypeInfo< VARIABLE1 >::linkName :
+            IF_ELSE_SWITCH( VP_ALL_LINK_TYPES )
+#undef IF_ELSE_SWITCH1
+            // default value
+            ofxVPLinkTypeInfo<VP_LINK_UNDEFINED >::linkName ;
 };
 
-template <>
-struct ofxVPLinkTypeInfo< VP_LINK_NUMERIC > {
-public:
-  using allSubTypes = TypeList< int, float >;
-  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-  static constexpr LinkType linkType = VP_LINK_NUMERIC;
-  static constexpr char linkName[] = "Numeric";
-  //static constexpr typdef linkDataTypes[] = { int, float };
-  //vector<typedef> test;
-};
-
-template <>
-struct ofxVPLinkTypeInfo< VP_LINK_STRING > {
-public:
-  using allSubTypes = TypeList< std::string >;
-  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-  static constexpr LinkType linkType = VP_LINK_STRING;
-  static constexpr char linkName[] = "Numeric";
-  //static constexpr typdef linkDataTypes[] = { int, float };
-  //vector<typedef> test;
-};
-
-//template <>
-//struct ofxVPLinkTypeInfo< VP_LINK_ARRAY > {
-//public:
-//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-//  static constexpr LinkType linkType = VP_LINK_ARRAY;
-//  static constexpr char linkName[] = "Numeric";
-//  //static constexpr typdef linkDataTypes[] = { int, float };
-//  //vector<typedef> test;
-//};
-
-//template <>
-//struct ofxVPLinkTypeInfo< VP_LINK_TEXTURE > {
-//public:
-//  using allSubTypes = TypeList< ofTexture >;
-//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-//  static constexpr LinkType linkType = VP_LINK_TEXTURE;
-//  static constexpr char linkName[] = "Numeric";
-//  //static constexpr typdef linkDataTypes[] = { int, float };
-//  //vector<typedef> test;
-//};
-
-//template <>
-//struct ofxVPLinkTypeInfo< VP_LINK_AUDIO > {
-//public:
-//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-//  static constexpr LinkType linkType = VP_LINK_AUDIO;
-//  static constexpr char linkName[] = "Numeric";
-//  //static constexpr typdef linkDataTypes[] = { int, float };
-//  //vector<typedef> test;
-//};
-
-//template <>
-//struct ofxVPLinkTypeInfo< VP_LINK_SPECIAL > {
-//public:
-//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-//  static constexpr LinkType linkType = VP_LINK_SPECIAL;
-//  static constexpr char linkName[] = "Numeric";
-//  //static constexpr typdef linkDataTypes[] = { int, float };
-//  //vector<typedef> test;
-//};
-
-//template <>
-//struct ofxVPLinkTypeInfo< VP_LINK_PIXELS > {
-//public:
-//  static constexpr unsigned char color[4] = { 0, 0, 0, 255 };
-//  static constexpr LinkType linkType = VP_LINK_PIXELS;
-//  static constexpr char linkName[] = "Numeric";
-//  //static constexpr typdef linkDataTypes[] = { int, float };
-//  //vector<typedef> test;
-//};
-
-
-// Convert enum to string
-inline const char* ToString(const LinkType& v){
-    switch (v){
-        case VP_LINK_NUMERIC:       return "VP_LINK_NUMERIC";
-        case VP_LINK_STRING:        return "VP_LINK_STRING";
-        case VP_LINK_ARRAY:         return "VP_LINK_ARRAY";
-        case VP_LINK_TEXTURE:       return "VP_LINK_TEXTURE";
-        case VP_LINK_AUDIO:         return "VP_LINK_AUDIO";
-        case VP_LINK_SPECIAL:       return "VP_LINK_SPECIAL";
-        case VP_LINK_PIXELS:        return "VP_LINK_PIXELS";
-        default:                    return "VP_LINK_UNDEFINED";
-    }
-};
 
 // compile-time utility for converting type-values to assiociated linktype
 // maybe ?
-#define GET_LINKTYPE(X) _Generic( (X), \
-    long double: VP_LINK_NUMERIC, \
-    float: VP_LINK_NUMERIC, \
-    int: VP_LINK_NUMERIC, \
-    std::string : VP_LINK_STRING, \
-    char[]: VP_LINK_STRING, \
-    array: VP_LINK_ARRAY, \
-    ofTexture: VP_LINK_TEXTURE, \
-    ofSoundBuffer: VP_LINK_SPECIAL, \
-    ofAudioBuffer: VP_LINK_AUDIO, \
-    ofPixels: VP_LINK_PIXELS, \
-    default: VP_LINK_UNDEFINED  \
-)(X)
+//#define GET_LINKTYPE(X) _Generic( (X), \
+//    long double: VP_LINK_NUMERIC, \
+//    float: VP_LINK_NUMERIC, \
+//    int: VP_LINK_NUMERIC, \
+//    std::string : VP_LINK_STRING, \
+//    char[]: VP_LINK_STRING, \
+//    array: VP_LINK_ARRAY, \
+//    ofTexture: VP_LINK_TEXTURE, \
+//    ofSoundBuffer: VP_LINK_SPECIAL, \
+//    ofAudioBuffer: VP_LINK_AUDIO, \
+//    ofPixels: VP_LINK_PIXELS, \
+//    default: VP_LINK_UNDEFINED  \
+//)(X)
 
-template<typename DATA_TYPE>
-inline LinkType& getLinkType() { // from value type to link type
-    static LinkType link_undefined = VP_LINK_UNDEFINED;
-    return link_undefined;
+// Constexpr utilities, with optimisation compile flags (-O3), this should be as fast as a switch statement
+template<constexpr const int I=LinkTypeIterator::numKeys-1>
+inline constexpr const char* getLinkName(const LinkType& _linkType){
+    // A bit tricky, a kind of recursive switch, for each enum, array search
+    return ( LinkTypeIterator::getEnumByIndex(I) ==_linkType)?ofxVPLinkTypeInfo< LinkTypeIterator::getEnumByIndex(I) >::linkName : getLinkName<(I-1)>( _linkType );//
 };
-template<typename DATA_TYPE>  // from value to link type
-inline LinkType& getLinkType(const DATA_TYPE& _value) {
-    return getLinkType<DATA_TYPE>();
-}
+template<>
+inline constexpr const char* getLinkName<0>(const LinkType& _linkType){
+    //constexpr const LinksIterator::Enum_t& CUR = LinksIterator::getEnumByIndex(0); // C++14 feature, but it compiles with clang in C++11, gives more informative errors when it can't compile as a consexpr
+    return ( LinkTypeIterator::getEnumByIndex(0) ==_linkType)? ofxVPLinkTypeInfo< LinkTypeIterator::getEnumByIndex(0) >::linkName : "NONE";
+};
 
-template<typename DATA_TYPE>
-inline const char* getLinkName() { // from link type
-    return "VP_LINK_UNDEFINED";
-};
-inline const char* getLinkName(const LinkType& _linkType) { // from link type
-    return ToString(_linkType);
-};
-inline ofColor getLinkColor(const LinkType& _linkType) { // from link type
+//template<typename DATA_TYPE>
+//inline LinkType& getLinkType() { // from value type to link type
+//    static LinkType link_undefined = VP_LINK_UNDEFINED;
+//    return link_undefined;
+//};
+//template<typename DATA_TYPE>
+//static constexpr LinkType getLinkTypeFromDataType = VP_LINK_UNDEFINED;
+
+// Get link type from data type
+//template<typename DATA_TYPE>  // Value-call maps to typename-call
+//inline constexpr LinkType& getLinkTypeFromDataType() {
+//    //return getLinkTypeFromDataType<DATA_TYPE>;
+//    return ofxVPLinkTypeInfo< getLinkTypeFromDataType<DATA_TYPE>() >::linkType;
+//};
+
+inline const ofColor getLinkColor(const LinkType& _linkType) { // from link type
     switch (_linkType) {
-        case VP_LINK_NUMERIC:       return COLOR_NUMERIC;
-        case VP_LINK_STRING:        return COLOR_STRING;
-        case VP_LINK_ARRAY:         return COLOR_ARRAY;
-        case VP_LINK_TEXTURE:       return COLOR_TEXTURE;
-        case VP_LINK_AUDIO:         return COLOR_AUDIO;
-        case VP_LINK_SPECIAL:       return COLOR_SPECIAL;
-        case VP_LINK_PIXELS:        return COLOR_PIXELS;
+        case VP_LINK_NUMERIC:       return ofxVPLinkTypeInfo<VP_LINK_NUMERIC>::ofColour;
+        case VP_LINK_STRING:        return ofxVPLinkTypeInfo<VP_LINK_STRING>::ofColour;
+//        case VP_LINK_ARRAY:         return ofxVPLinkTypeInfo<VP_LINK_ARRAY>::ofColour;
+//        case VP_LINK_TEXTURE:       return ofxVPLinkTypeInfo<VP_LINK_TEXTURE>::ofColour;
+//        case VP_LINK_AUDIO:         return ofxVPLinkTypeInfo<VP_LINK_AUDIO>::ofColour;
+//        case VP_LINK_SPECIAL:       return ofxVPLinkTypeInfo<VP_LINK_SPECIAL>::ofColour;
+//        case VP_LINK_PIXELS:        return ofxVPLinkTypeInfo<VP_LINK_PIXELS>::ofColour;
         //case VP_LINK_SCRIPT:        return COLOR_SCRIPT;
-        default:                    return COLOR_UNDEFINED;
+        default:                    return ofxVPLinkTypeInfo<VP_LINK_UNDEFINED>::ofColour;
     }
 };
-inline ImU32 getLinkImguiColor(const LinkType& _linkType) { // from link type
-    const ofColor& color = getLinkColor(_linkType);
-    return IM_COL32(color.r*255, color.g*255, color.b*255, color.a*255);
+// This function returns the type from a runtime variable (dynamic).
+static constexpr ImU32 getLinkImguiColor(const LinkType& _linkType) { // from link type
+//    const ofColor& color = getLinkColor(_linkType);
+//    return IM_COL32(color.r*255, color.g*255, color.b*255, color.a*255);
+//    switch (_linkType) {
+//        case VP_LINK_NUMERIC:       return ofxVPLinkTypeInfo<VP_LINK_NUMERIC>::imguiColor; break;
+//        case VP_LINK_STRING:        return ofxVPLinkTypeInfo<VP_LINK_STRING>::imguiColor; break;
+//        case VP_LINK_ARRAY:         return ofxVPLinkTypeInfo<VP_LINK_ARRAY>::imguiColor;
+//        case VP_LINK_TEXTURE:       return ofxVPLinkTypeInfo<VP_LINK_TEXTURE>::imguiColor;
+//        case VP_LINK_AUDIO:         return ofxVPLinkTypeInfo<VP_LINK_AUDIO>::imguiColor;
+//        case VP_LINK_SPECIAL:       return ofxVPLinkTypeInfo<VP_LINK_SPECIAL>::imguiColor;
+//        case VP_LINK_PIXELS:        return ofxVPLinkTypeInfo<VP_LINK_PIXELS>::imguiColor;
+        //case VP_LINK_SCRIPT:        return COLOR_SCRIPT;
+//        default:                    return ofxVPLinkTypeInfo<VP_LINK_UNDEFINED>::imguiColor; break;
+//    }
+      return
+            _linkType == VP_LINK_NUMERIC ?  ofxVPLinkTypeInfo<VP_LINK_NUMERIC   >::imguiColor :
+            _linkType == VP_LINK_STRING  ?  ofxVPLinkTypeInfo<VP_LINK_STRING    >::imguiColor :
+            _linkType == VP_LINK_ARRAY   ?  ofxVPLinkTypeInfo<VP_LINK_ARRAY     >::imguiColor :
+            _linkType == VP_LINK_TEXTURE ?  ofxVPLinkTypeInfo<VP_LINK_TEXTURE   >::imguiColor :
+            _linkType == VP_LINK_AUDIO   ?  ofxVPLinkTypeInfo<VP_LINK_AUDIO     >::imguiColor :
+            _linkType == VP_LINK_SPECIAL ?  ofxVPLinkTypeInfo<VP_LINK_SPECIAL   >::imguiColor :
+            _linkType == VP_LINK_PIXELS  ?  ofxVPLinkTypeInfo<VP_LINK_PIXELS    >::imguiColor :
+                                            ofxVPLinkTypeInfo<VP_LINK_UNDEFINED >::imguiColor;
 };
+static constexpr ImU32 getLinkImguiColor(const LinkType& _linkType);
 
 
 // - - - - - - - - - -
@@ -448,7 +571,7 @@ public:
 template<typename ACCEPT_TYPE>
 class HasInlet : public AbstractHasInlet {
 public:
-    HasInlet() : AbstractHasInlet( getLinkType< ACCEPT_TYPE >() ) {};
+    HasInlet() : AbstractHasInlet( getLinkTypeFromDataType< ACCEPT_TYPE >() ) {};
     virtual ~HasInlet(){
 
     };
@@ -506,7 +629,7 @@ protected:
 template<typename OUTPUT_TYPE>
 class HasOutlet : public AbstractHasOutlet {
 public:
-    HasOutlet() : AbstractHasOutlet( getLinkType< OUTPUT_TYPE >() ) {
+    HasOutlet() : AbstractHasOutlet( getLinkTypeFromDataType< OUTPUT_TYPE >() ) {
         //std::cout << "HasOutlet = " << getLinkType< OUTPUT_TYPE >() << " / "  << getLinkName(this->linkType) << std::endl;
     };
     virtual ~HasOutlet() {
@@ -697,7 +820,7 @@ public:
 template<typename ACCEPT_TYPE>
 class HasModifier : public AbstractHasModifier {
 public:
-    HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( getLinkType<ACCEPT_TYPE>() , &_underlyingValue ) {
+    HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( getLinkTypeFromDataType<ACCEPT_TYPE>() , &_underlyingValue ) {
         //std::cout << "HasModifier() type = " << getLinkType<ACCEPT_TYPE>() << " - " << (this->AbstractHasModifier::linkType) << std::endl;
     };
     virtual ~HasModifier(){
@@ -1158,7 +1281,7 @@ protected:
                             continue;
                         }
 
-                        if( ImGuiExNodeLinkActionFlags_ linkResult = _nodeCanvas.AddLink( link->fromPinTyped->outletPosition, link->toPinTyped.inletPosition, IM_COL32(200,200,200,200), "LABEL" ) ){
+                        if( ImGuiExNodeLinkActionFlags_ linkResult = _nodeCanvas.AddLink( link->fromPinTyped->outletPosition, link->toPinTyped.inletPosition, ofxVPLinkTypeInfo< getLinkTypeFromDataType< DATA_TYPE >() >::imguiColor, "LABEL" ) ){
                             // Disconnect ?
                             if( linkResult == ImGuiExNodeLinkActionFlags_Disconnect ){
                                 //++it;
@@ -1191,7 +1314,7 @@ protected:
     void ImGuiPrintParameterInfo(){
         // Name
         ImGui::Text( "UID: %s", this->getUID().c_str() );
-        ImGui::Text( "LinkType: %s", getLinkName<DATA_TYPE>() );
+        ImGui::Text( "LinkType: %s", getLinkNameFromDataType<DATA_TYPE>() );
         ImGui::Separator();
 
         // Outlet info
@@ -1323,7 +1446,7 @@ public:
     virtual bool connectWithOutlet( AbstractHasOutlet& _outlet ) override {
         //std::cout << "Modifier<T>::connectWithOutlet() --> connecting parameter" << std::endl;
         if( !acceptsLinkType( _outlet.linkType ) ){
-            ofLogNotice("ParamInletModifier::ConnectWithOutlet()") << "Incompatible link type ! (" << getLinkName<MODIFIER_TYPE>() << " <<  vs " << getLinkName(_outlet.linkType) << ")" << std::endl;
+            ofLogNotice("ParamInletModifier::ConnectWithOutlet()") << "Incompatible link type ! (" << getLinkNameFromDataType<MODIFIER_TYPE>() << " <<  vs " << getLinkName(_outlet.linkType) << ")" << std::endl;
             return false;
         }
 
