@@ -33,7 +33,7 @@ std::ostream& operator << (std::ostream& _out, const VPError& _e){
 #define DEFINE_OFCOLOR_FOR(LINKTYPE) const ofColor ofxVPLinkTypeInfo< LINKTYPE >::ofColour = { ofxVPLinkTypeInfo<LINKTYPE>::color[0], ofxVPLinkTypeInfo<LINKTYPE>::color[1], ofxVPLinkTypeInfo<LINKTYPE>::color[2], ofxVPLinkTypeInfo<LINKTYPE>::color[3] };
 #define DECLARE_IMCOLOR_FOR(LINKTYPE) constexpr const ImU32 ofxVPLinkTypeInfo< LINKTYPE >::imguiColor;// = IM_COL32( ofxVPLinkTypeInfo< LINKTYPE >::color[0],ofxVPLinkTypeInfo< LINKTYPE >::color[1], ofxVPLinkTypeInfo< LINKTYPE >::color[2], ofxVPLinkTypeInfo< LINKTYPE >::color[3] );
 #define DECLARE_LINKNAME_FOR(LINKTYPE) constexpr const char ofxVPLinkTypeInfo< LINKTYPE >::linkName[];
-#define DECLARE_LINKTYPE_FOR(LINKTYPE) constexpr const LinkType ofxVPLinkTypeInfo< LINKTYPE >::linkTyyype;
+#define DECLARE_LINKTYPE_FOR(LINKTYPE) constexpr const LinkType ofxVPLinkTypeInfo< LINKTYPE >::linkType;
 #define SET_VARIABLES_FOR(LINKTYPE) DECLARE_COLOR_FOR(LINKTYPE) DEFINE_OFCOLOR_FOR(LINKTYPE) DECLARE_IMCOLOR_FOR(LINKTYPE) DECLARE_LINKNAME_FOR(LINKTYPE) DECLARE_LINKTYPE_FOR(LINKTYPE)
 
 SET_VARIABLES_FOR( VP_LINK_UNDEFINED );

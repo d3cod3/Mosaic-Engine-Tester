@@ -198,7 +198,7 @@ void mosaicNode::drawObjectNodeGui( ImGuiEx::NodeCanvas& _nodeCanvas ){
             // Draw inlet Pin
             if(param->getIsEditable()){
                 AbstractHasModifier& paramHasModifier = param->getAsHasModifier();
-                _nodeCanvas.AddNodePin( param->getUID().c_str(), paramHasModifier.getHasModifierName().c_str(), paramHasModifier.getInletPosition(), getLinkName(paramHasModifier.linkType), paramHasModifier.linkType, IM_COL32(255,255,255,255), paramHasModifier.getNumModifiers()>0, ImGuiExNodePinsFlags_Left );
+                _nodeCanvas.AddNodePin( param->getUID().c_str(), paramHasModifier.getHasModifierName().c_str(), paramHasModifier.getInletPosition(), getLinkName(paramHasModifier.modifierLinkType), paramHasModifier.modifierLinkType, IM_COL32(255,255,255,255), paramHasModifier.getNumModifiers()>0, ImGuiExNodePinsFlags_Left );
             }
             // Draw outlet pin
             try {
@@ -429,7 +429,7 @@ int mosaicNode::getNumInlets(){
     return numInlets;
 }
 int mosaicNode::getNumOutlets(){
-    return numOutlets;//parameters.size() + myDynamicParams.size();// numOutlets;
+    return parameters.size() + myDynamicParams.size();// numOutlets;
 }
 int mosaicNode::getIsResizable(){
     return true;

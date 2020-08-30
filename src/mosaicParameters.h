@@ -194,9 +194,7 @@ struct ofxVPLinkTypeInfo;
 // Data type to link type conversion (This is non-standard in C++14, fallback below)
 // Will be individually overruled by data types
 template<typename DATA_TYPE>
-static constexpr LinkType getLinkTypeFromDataType() {
-    return VP_LINK_UNDEFINED;
-};
+static constexpr const LinkType& getLinkTypeFromDataType();
 
 // Data type to link name conversion (static)
 template<typename DATA_TYPE>
@@ -227,7 +225,8 @@ static constexpr const char* getLinkName(){
 // Helper func for the definition below
 #define DECLARE_DATA2LINKTYPE(TYPE, DATA...) ROUTE_DATA_TO_MACRO_SIMPLE( DATA )( DECLARE_DATA2LINKTYPE1, TYPE, DATA )
 #define DECLARE_DATA2LINKTYPE1(TYPE, DATA) \
-    template<> constexpr LinkType getLinkTypeFromDataType< DATA >(){ return TYPE; };
+    template<> constexpr const LinkType& getLinkTypeFromDataType< DATA >(){ return ofxVPLinkTypeInfo< TYPE >::linkType; };
+//    template<> constexpr LinkType getLinkTypeFromDataType< DATA >(){ return TYPE; };
 
 // Static link information (compile-time constructed)
 #define VP_REGISTER_LINKTYPE(TYPE, NAME, R, G, B, SUBTYPES...)\
@@ -239,7 +238,7 @@ static constexpr const char* getLinkName(){
       static const ofColor ofColour;\
       /*static inline const ofColor ofColourOldToDelete(){ return ofColor( R, G, B, 255 ); };*/ \
       static constexpr const ImU32 imguiColor ={ IM_COL32(R,G,B,255) };\
-      static constexpr const LinkType linkTyyype = { TYPE };\
+      static constexpr const LinkType linkType = { TYPE };\
       static constexpr const char linkName[sizeof(NAME)] = { NAME }; \
     };\
     DECLARE_DATA2LINKTYPE(TYPE,SUBTYPES)\
@@ -255,6 +254,12 @@ VP_REGISTER_LINKTYPE( VP_LINK_TEXTURE,   "Texture"  , 120, 255, 255, ofTexture  
 VP_REGISTER_LINKTYPE( VP_LINK_AUDIO,     "Audio"    , 255, 255, 120, ofSoundBuffer  )
 VP_REGISTER_LINKTYPE( VP_LINK_SPECIAL,   "Special"  , 255, 255, 255, Special        )
 VP_REGISTER_LINKTYPE( VP_LINK_PIXELS,    "Pixels"   , 0  , 180, 140, ofPixels       )
+
+// Fallback template
+template<typename DATA_TYPE>
+static constexpr const LinkType& getLinkTypeFromDataType() {
+    return ofxVPLinkTypeInfo<VP_LINK_UNDEFINED>::linkType;
+ };
 
 //#define IF_ELSE_SWITCH( CONDITION, STATEMENT, VARIABLES... ) ROUTE_DATA_TO_MACRO_10( VARIABLES, IF_ELSE_SWITCH10, IF_ELSE_SWITCH9, IF_ELSE_SWITCH8, IF_ELSE_SWITCH7, IF_ELSE_SWITCH6, IF_ELSE_SWITCH5, IF_ELSE_SWITCH4, IF_ELSE_SWITCH3, IF_ELSE_SWITCH2, IF_ELSE_SWITCH1 )( CONDITION, STATEMENT, VARIABLES )
 #define IF_ELSE_SWITCH( VARIABLES... ) \
@@ -304,8 +309,9 @@ inline constexpr const char* getLinkName(const LinkType& _linkType){
 };
 template<>
 inline constexpr const char* getLinkName<0>(const LinkType& _linkType){
-    //constexpr const LinksIterator::Enum_t& CUR = LinksIterator::getEnumByIndex(0); // C++14 feature, but it compiles with clang in C++11, gives more informative errors when it can't compile as a consexpr
-    return ( LinkTypeIterator::getEnumByIndex(0) ==_linkType)? ofxVPLinkTypeInfo< LinkTypeIterator::getEnumByIndex(0) >::linkName : "NONE";
+    // C++14 feature, but it compiles with clang in C++11, gives more informative errors when it can't compile as a consexpr
+    //constexpr const LinksIterator::Enum_t& CUR = LinksIterator::getEnumByIndex(0);
+    return ( LinkTypeIterator::getEnumByIndex(0) ==_linkType)? ofxVPLinkTypeInfo< LinkTypeIterator::getEnumByIndex(0) >::linkName : "UNNAMED_LINK";
 };
 
 //template<typename DATA_TYPE>
@@ -589,7 +595,9 @@ template<typename T> class ParamInletModifier;
 
 class AbstractHasOutlet : public HasPin {
 public:
-    AbstractHasOutlet( LinkType _linkType = VP_LINK_UNDEFINED ) : HasPin(_linkType) {};
+    AbstractHasOutlet( LinkType _linkType = VP_LINK_UNDEFINED ) : HasPin(_linkType) {
+        //std::cout << "AbstractHasOutlet() " << (AbstractHasOutlet*)this << " type = " << (this->linkType) << "/" << getLinkName(this->linkType) << " | " <<  (&this->linkType) << "/" << &_linkType << std::endl;
+    };
 
     template<typename MODIFIER_TYPE>
     MODIFIER_TYPE& getTypedOutlet() { // Todo : add try in method name, as it can throw
@@ -724,12 +732,13 @@ public:
 };
 
 // The address-of operator (&) can only be used with an lvalue.
-#define IS_LVALUE(x) ( (sizeof &(x)), (x) )
+//#define IS_LVALUE(x) ( (sizeof &(x)), (x) )
 
 class AbstractHasModifier { // todo: rename to AbstractHasModifiers
 public:
-    AbstractHasModifier(const LinkType& _linkType, const void* _underlyingValue) : underlyingValueAddr(_underlyingValue), linkType(_linkType){
-        //std::cout << "AbstractHasModifier() " << (AbstractHasModifier*)this << " type = " << (this->linkType) << "/" << _linkType <<" - " << IS_LVALUE(_linkType) << std::endl;
+    AbstractHasModifier(const LinkType& _linkType, const void* _underlyingValue) : underlyingValueAddr(_underlyingValue), modifierLinkType(_linkType){
+        //assert( std::is_rvalue_reference<const LinkType&>::value ); // _linkType must be a variable reference ! Dummy-protect against volatile memory
+        //std::cout << "AbstractHasModifier() " << (AbstractHasModifier*)this << " type = " << (this->modifierLinkType) << " / " << getLinkName(this->modifierLinkType) << " | " <<  (&this->modifierLinkType) << "/" << &_linkType << " - " << IS_LVALUE(_linkType) << std::endl;
     };
     virtual ~AbstractHasModifier(){};
     //virtual bool addModifier() = 0;
@@ -814,14 +823,14 @@ public:
     std::list<abstractParamModifier*> abstractParamModifiers;
     const void* underlyingValueAddr;
 
-    const LinkType& linkType; // wrong ? should be in hasOutlet ?
+    const LinkType& modifierLinkType; // wrong ? should be in hasOutlet ?
 };
 
 template<typename ACCEPT_TYPE>
 class HasModifier : public AbstractHasModifier {
 public:
     HasModifier( const ACCEPT_TYPE& _underlyingValue  ) : AbstractHasModifier( getLinkTypeFromDataType<ACCEPT_TYPE>() , &_underlyingValue ) {
-        //std::cout << "HasModifier() type = " << getLinkType<ACCEPT_TYPE>() << " - " << (this->AbstractHasModifier::linkType) << std::endl;
+        //std::cout << "HasModifier() type = " << getLinkTypeFromDataType<ACCEPT_TYPE>() << " - " << (this->AbstractHasModifier::linkType) << std::endl;
     };
     virtual ~HasModifier(){
         for(ParamModifier<ACCEPT_TYPE>* modifier : paramModifiers){
@@ -916,10 +925,12 @@ protected:
     std::list<ParamModifier<ACCEPT_TYPE>*> paramModifiers; // stores ptr but owns them. Be sure to clean memory! Mirrored in AbstractHasModifiers::abstractParamModifiers
 };
 
+// Todo : rename this to ofxVPParameter
 template<typename DATA_TYPE, bool ENABLE_OUTLET=true>
 //class Parameter : public HasInlet<DATA_TYPE>, public AbstractParameter {
 class Parameter : public HasModifier<DATA_TYPE>, public std::conditional<ENABLE_OUTLET, HasOutlet<DATA_TYPE>, void>::type, public AbstractParameter {
 public:
+    using HasModifier<DATA_TYPE>::paramModifiers;
 
     Parameter( std::string _paramName = "Parameter", DATA_TYPE _value = DATA_TYPE() ) : HasModifier<DATA_TYPE>(dataValue), std::conditional<ENABLE_OUTLET, HasOutlet<DATA_TYPE>, void>::type(), AbstractParameter(_paramName), dataValue(_value) {
 //# ifdef OFXVP_DEBUG_PARAMS
@@ -927,13 +938,21 @@ public:
 //# endif
         //std::cout << "After " << this->getUID() << " (done)" << std::endl;
         //std::cout <<  __PRETTY_FUNCTION__ << std::endl;
-        //std::cout << this->getUID() << " " << (AbstractHasModifier*)this << ". Linktypes ( "<< this->AbstractHasModifier::linkType <<"["<< getLinkType< DATA_TYPE >() << "]" <<" / "<< this->AbstractHasOutlet::linkType <<" ) = " << getLinkName(this->AbstractHasModifier::linkType) << " - " << getLinkName(this->AbstractHasOutlet::linkType) << std::endl;
+        //if( ENABLE_OUTLET && this->linkType != this->modifierLinkType){
+            //std::cout << this->getUID() << " " << (AbstractHasModifier*)this << ". Linktypes ( "<< this->AbstractHasModifier::linkType <<"["<< getLinkTypeFromDataType< DATA_TYPE >() << "|" << getLinkNameFromDataType<DATA_TYPE>() << "|" << getLinkName(this->AbstractHasModifier::linkType) << "]" <<" / "<< this->AbstractHasOutlet::linkType << "["<< getLinkTypeFromDataType< DATA_TYPE >() << "]" <<" ) = " << getLinkName(this->AbstractHasModifier::linkType) << " - " << getLinkName(this->AbstractHasOutlet::linkType) << std::endl;
+            //std::cout << this->getUID() << " "<< (AbstractHasModifier*)this << ".-----"
+                      //<< "Linktypes ( HasModifier:"<< this->modifierLinkType << " @ "<< &this->modifierLinkType << " - HasOutlet:" << this->linkType << " @ "<< &this->linkType  << ")" // - HasInlet:" << this->AbstractHasInlet::linkType
+                      //<<"["<< getLinkTypeFromDataType< DATA_TYPE >() << "|" << getLinkNameFromDataType<DATA_TYPE>() << "|" << getLinkName(this->AbstractHasModifier::linkType) << "]" <<" / "<< this->AbstractHasOutlet::linkType << "["<< getLinkTypeFromDataType< DATA_TYPE >() << "]" <<" ) = " << getLinkName(this->AbstractHasModifier::linkType) << " - " << getLinkName(this->AbstractHasOutlet::linkType)
+                      //<< reinterpret_cast<AbstractHasInlet*>(this) // Wtf ?!
+                      //<< (AbstractHasInlet*)this
+                      //<< "&VP_LINKTYPE_STRING=" << getLinkTypeFromDataType<std::string>()
+                      //<< std::endl;
+        //}
 
         // Check correct behaviour if this assert is triggered. (undefined behavior for now)
-        assert(this->AbstractHasInlet::linkType == this->AbstractHasOutlet::linkType);// "Inlet and Outlet have different linktypes. This is not yet supported. Please use 2 distinct parameters instead." );
-        //assert( this->AbstractHasInlet::linkType == VP_LINK_UNDEFINED ); // Undefined link type. You have to give one !
+        assert( !ENABLE_OUTLET || this->modifierLinkType == this->linkType );// "Inlet and Outlet have different linktypes. This is not yet supported. Please use 2 distinct parameters instead." );
+        assert( this->modifierLinkType != VP_LINK_UNDEFINED ); // Undefined link type. You have to give one !
     };
-    using HasModifier<DATA_TYPE>::paramModifiers;
 
     // - - - - - - - - - -
     // Abstract functions
@@ -1218,7 +1237,8 @@ protected:
                 isConnected = inlet.isConnected();
             }
             // Draw pin
-            ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->getInletPosition(), getLinkName(this->AbstractHasModifier::linkType), this->AbstractHasModifier::linkType, getLinkImguiColor(this->AbstractHasModifier::linkType), isConnected, ImGuiExNodePinsFlags_Left );
+            //std::cout << this->AbstractHasModifier::linkType << " / " << paramHasModifier.linkType ;//<< std::endl;
+            ImGuiExNodePinResponse pinData = _nodeCanvas.AddNodePin( this->getUID().c_str(), this->getHasModifierName().c_str(), this->getInletPosition(), getLinkName(this->modifierLinkType), paramHasModifier.modifierLinkType, getLinkImguiColor(paramHasModifier.modifierLinkType), isConnected, ImGuiExNodePinsFlags_Left );
             if(pinData){
                 if( pinData.flag == ImGuiExNodePinActionFlags_ConnectPin ){
                     if( this->connectWithOutlet( std::string( pinData.otherUid ) ) ){
