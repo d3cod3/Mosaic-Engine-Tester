@@ -494,7 +494,7 @@ private:
 // Ensures an interface between outlets and inlets (which inherit from :haspin)
 class HasPin {
 public:
-    HasPin(LinkType _linkType = VP_LINK_UNDEFINED) : linkType(_linkType) {
+    HasPin(const LinkType& _linkType = VP_LINK_UNDEFINED) : linkType( _linkType ) {
         //std::cout << "New Pin : " << ToString(_linkType) << " - " << std::endl;
     };
     virtual ~HasPin(){};
@@ -506,7 +506,7 @@ public:
     virtual const std::string& getPinLabel() const = 0;
 
     ImVec2 pinPosition;
-    const LinkType linkType;
+    const LinkType& linkType;
     //ofxVPHasUID::stringKeyType owningObjectID; // needed ?
 
 private :
@@ -533,7 +533,7 @@ public:
 // - - - - - - - - - -
 class AbstractHasInlet : public HasPin {
 public:
-    AbstractHasInlet( LinkType _linkType = VP_LINK_UNDEFINED ) : HasPin(_linkType) {};
+    AbstractHasInlet( const LinkType& _linkType ) : HasPin(_linkType) {};
 
     virtual bool acceptsLinkType( const LinkType& _linktype ) = 0;
     //virtual accept();
@@ -595,7 +595,7 @@ template<typename T> class ParamInletModifier;
 
 class AbstractHasOutlet : public HasPin {
 public:
-    AbstractHasOutlet( LinkType _linkType = VP_LINK_UNDEFINED ) : HasPin(_linkType) {
+    AbstractHasOutlet( const LinkType& _linkType ) : HasPin(_linkType) {
         //std::cout << "AbstractHasOutlet() " << (AbstractHasOutlet*)this << " type = " << (this->linkType) << "/" << getLinkName(this->linkType) << " | " <<  (&this->linkType) << "/" << &_linkType << std::endl;
     };
 
