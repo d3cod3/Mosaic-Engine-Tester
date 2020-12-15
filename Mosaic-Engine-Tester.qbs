@@ -31,6 +31,13 @@ Project{
             'src/imgui/imgui_profiler.h',
             'src/imgui/imgui_stdlib.cpp',
             'src/imgui/imgui_stdlib.h',
+            //
+            //'tracy/*.hpp',
+            //'tracy/*.cpp',
+            //'tracy/client/*',
+            //'tracy/*.cpp',
+            'tracy/Tracy.hpp',
+            'tracy/TracyClient.cpp',
         ]
 
         of.addons: [
@@ -43,11 +50,18 @@ Project{
         // flags by default to add the core libraries, search paths...
         // this flags can be augmented through the following properties:
         of.pkgConfigs: []       // list of additional system pkgs to include
-        of.includePaths: ['src/imgui']     // include search paths
+        of.includePaths: ['src/imgui', 'tracy']     // include search paths
         of.cFlags: []           // flags passed to the c compiler
         of.cxxFlags: []         // flags passed to the c++ compiler
         of.linkerFlags: []      // flags passed to the linker
-        of.defines: []          // defines are passed as -D to the compiler
+        of.defines: [ // defines are passed as -D to the compiler
+            "TRACY_ENABLE", // Tracy runs better in Release context, but it's only for debugging
+            // Getting started with tracy
+            // - Pull the submodule
+            // - Install the profiler dependencies : (osx) brew install capstone freetype2 glfw3 gtk+3
+            // - Build the profiler : cd /Mosaic-Engine-Tester/tracy/profiler/build/unix && make release
+            // More information on Tracy can be found in it's manual, available on their releases github page.
+        ]
         // and can be checked with #ifdef or #if in the code
         of.frameworks: []       // osx only, additional frameworks to link with the project
         of.staticLibraries: []  // static libraries

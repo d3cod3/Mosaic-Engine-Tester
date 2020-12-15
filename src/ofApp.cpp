@@ -1,8 +1,10 @@
 #include "ofApp.h"
+#include <Tracy.hpp>
+
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-
+    ZoneScopedN("ofApp::Setup()");
     ofSetLogLevel(OF_LOG_NOTICE);
     ofSetFrameRate(60);
 
@@ -37,22 +39,31 @@ void ofApp::setup(){
     // new way ?
     //nodesMap[0]->parameters.front()->connectWith( nodesMap[1]->parameters.front() );
 
+    TracyAppInfo("MosaicVersion 777", sizeof("MosaicVersion 777"));
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
+    ZoneScopedN("ofApp::Update()");
     updateCanvasViewport();
     ofSetWindowTitle("Mosaic Engine Tester");
 
     // update nodes
-    for(map<int,shared_ptr<mosaicNode>>::iterator it = nodesMap.begin(); it != nodesMap.end(); it++ ){
-        it->second->update(nodesMap);
+    {
+        ZoneScopedN("node Objects update loop");
+        for(map<int,shared_ptr<mosaicNode>>::iterator it = nodesMap.begin(); it != nodesMap.end(); it++ ){
+            //ZoneScopedN("nodeObjectUpdate");
+            it->second->update(nodesMap);
+        }
     }
+
+    TracyPlotConfig("MosaicFPS", tracy::PlotFormatType::Number);
+    TracyPlot("MosaicFPS", ofGetFrameRate());
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-
+    ZoneScopedN("ofApp::Draw()");
     ofPushView();
     ofPushStyle();
     ofPushMatrix();
@@ -75,8 +86,10 @@ void ofApp::draw(){
     // END VP DRAW
 
     if ( isCanvasVisible ){
+        ZoneScopedN("node Objects draw loop");
         // draw nodes (will be in PatchObject)
         for(map<int,shared_ptr<mosaicNode>>::iterator it = nodesMap.begin(); it != nodesMap.end(); it++ ){
+            ZoneScopedN("nodeObjectDraw");
             shared_ptr<mosaicNode> node = it->second;
 
             // Let objects draw their own Gui
@@ -107,6 +120,8 @@ void ofApp::draw(){
 
     // LIVE PATCHING SESSION
     //drawLivePatchingSession();
+
+    FrameMark; // Tracy end of frame
 }
 
 //--------------------------------------------------------------
