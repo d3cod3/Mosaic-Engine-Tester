@@ -55,12 +55,13 @@ Project{
         of.cxxFlags: []         // flags passed to the c++ compiler
         of.linkerFlags: []      // flags passed to the linker
         of.defines: [ // defines are passed as -D to the compiler
-            "TRACY_ENABLE", // Tracy runs better in Release context, but it's only for debugging
+            //"TRACY_ENABLE", // Tracy runs better in Release context, but it's only for debugging
             // Getting started with tracy
             // - Pull the submodule
             // - Install the profiler dependencies : (osx) brew install capstone freetype2 glfw3 gtk+3
             // - Build the profiler : cd /Mosaic-Engine-Tester/tracy/profiler/build/unix && make release
             // More information on Tracy can be found in it's manual, available on their releases github page.
+            "OFXIMGUI_DEBUG",
         ]
         // and can be checked with #ifdef or #if in the code
         of.frameworks: []       // osx only, additional frameworks to link with the project
