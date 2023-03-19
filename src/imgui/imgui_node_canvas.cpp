@@ -215,7 +215,7 @@ void ImGuiEx::NodeCanvas::End(){
     IM_ASSERT(isDrawingCanvas == true); // // Begin() wasn't called
     IM_ASSERT(isDrawingNode == false); // Forgot to call EndNode()
 
-    isAnyCanvasNodeHovered = ImGui::IsAnyWindowHovered();
+    isAnyCanvasNodeHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
 
     // Got links (selection) to delete ?
 //    if( ImGui::GetIO().KeysDown[ImGui::GetIO().KeyMap[ImGuiKey_Delete]] && selectedLinks.size()>0 && !ImGui::IsAnyItemFocused() ){
@@ -1034,7 +1034,7 @@ ImGuiExNodePinResponse ImGuiEx::NodeCanvas::AddNodePin( const char* _dragDropDat
                     auto connectingColor = activeLink.linkColor;//ImGui::ColorConvertU32ToFloat4(activeLink.linkColor);
                     setColorTransparency(connectingColor, 128);//connectingColor.w = 0.4f;
                     const LinkBezierData link_data = get_link_renderable( activeLink.fromPinPos, activeLink.toPinPos,IMGUI_EX_NODE_LINK_LINE_SEGMENTS_PER_LENGTH);
-                    ImGui::GetForegroundDrawList()->AddBezierCurve(link_data.bezier.p0,link_data.bezier.p1,link_data.bezier.p2,link_data.bezier.p3,connectingColor,IMGUI_EX_NODE_LINK_THICKNESS,link_data.num_segments);
+                    ImGui::GetForegroundDrawList()->AddBezierCubic(link_data.bezier.p0,link_data.bezier.p1,link_data.bezier.p2,link_data.bezier.p3,connectingColor,IMGUI_EX_NODE_LINK_THICKNESS,link_data.num_segments);
 
                     // Draw link info
                     //ImVec2 tempPos = activeLink.fromPinPos - (activeLink.fromPinPos - (activeLink.toPinPos + ImVec2( IMGUI_EX_NODE_PIN_WIDTH * -.5f, pinLayout.pinSpace.y * .5f)))*.5f - ImGui::CalcTextSize(activeLink.linkLabel.c_str())*.5f; // Use this to place in middle of cable
@@ -1313,7 +1313,7 @@ ImGuiExNodeLinkActionFlags_ ImGuiEx::NodeCanvas::AddLink(const ImVec2& _fromPos,
     }
 
     // Handle Link deletion ?
-    if( linkIsSelected && ImGui::GetIO().KeysDown[ImGui::GetIO().KeyMap[ImGuiKey_Delete]] && !ImGui::IsAnyItemFocused() ){
+    if( linkIsSelected && ImGui::IsKeyPressed(ImGuiKey_Delete) && !ImGui::IsAnyItemFocused() ){
         selectedLinks.erase(existingSelection);
         linkIsSelected = false;
 
@@ -1324,10 +1324,10 @@ ImGuiExNodeLinkActionFlags_ ImGuiEx::NodeCanvas::AddLink(const ImVec2& _fromPos,
     // draw selection wire
     if( linkIsSelected ){
         ImU32 selectedColor = Darken(_color, .3f);
-        canvasDrawList->AddBezierCurve(link_data.bezier.p0, link_data.bezier.p1, link_data.bezier.p2, link_data.bezier.p3, selectedColor, IMGUI_EX_NODE_LINK_THICKNESS*2, link_data.num_segments);
+        canvasDrawList->AddBezierCubic(link_data.bezier.p0, link_data.bezier.p1, link_data.bezier.p2, link_data.bezier.p3, selectedColor, IMGUI_EX_NODE_LINK_THICKNESS*2, link_data.num_segments);
     }
     // Draw regular wire
-    canvasDrawList->AddBezierCurve(link_data.bezier.p0, link_data.bezier.p1, link_data.bezier.p2, link_data.bezier.p3, _color, IMGUI_EX_NODE_LINK_THICKNESS, link_data.num_segments);
+    canvasDrawList->AddBezierCubic(link_data.bezier.p0, link_data.bezier.p1, link_data.bezier.p2, link_data.bezier.p3, _color, IMGUI_EX_NODE_LINK_THICKNESS, link_data.num_segments);
 
     // Todo: Handle visualize return value. How to visualize a node ?
 

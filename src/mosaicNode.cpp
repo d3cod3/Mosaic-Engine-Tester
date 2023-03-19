@@ -1,4 +1,6 @@
 #include "mosaicNode.h"
+#include "Tracy.hpp"
+#include "ImHelpers.h"
 
 //--------------------------------------------------------------
 void mosaicNode::setup(){
@@ -105,20 +107,24 @@ void mosaicNode::setup(){
 
 //--------------------------------------------------------------
 void mosaicNode::update(std::map<int,std::shared_ptr<mosaicNode>> &nodes){
-
+    ZoneScopedN("mosaicNode::Update()");
     // update links ( connected params dataflow )
-    for(int out=0;out<numOutlets;out++){
-        for(int i=0;i<static_cast<int>(linksTo.size());i++){
-            if(linksTo[i]->fromOutletID == out){
-                // send data through links
-                nodes[linksTo[i]->toObjectID]->_inletParams[linksTo[i]->toInletID] = _outletParams[out];
+    {
+        ZoneScopedN("sync data from outlets to inlets");
+        for(int out=0;out<numOutlets;out++){
+            for(int i=0;i<static_cast<int>(linksTo.size());i++){
+                if(linksTo[i]->fromOutletID == out){
+                    // send data through links
+                    nodes[linksTo[i]->toObjectID]->_inletParams[linksTo[i]->toInletID] = _outletParams[out];
+                }
             }
         }
     }
 
 
     // bypass params from inlets to outlets (basic standard node operation)
-
+    {
+    ZoneScopedN("Get data from inlets");
     *(float *)&_outletParams[0] = *(float *)&_inletParams[0];
 
     *static_cast<std::string *>(_outletParams[1]) = *static_cast<std::string *>(_inletParams[1]);
@@ -130,11 +136,12 @@ void mosaicNode::update(std::map<int,std::shared_ptr<mosaicNode>> &nodes){
     *static_cast<ofSoundBuffer *>(_outletParams[4]) = *static_cast<ofSoundBuffer *>(_inletParams[4]);
 
     *static_cast<ofPixels *>(_outletParams[5]) = *static_cast<ofPixels *>(_inletParams[5]);
-
+    }
 }
 
 //--------------------------------------------------------------
 void mosaicNode::draw(){ // not needed anymore ?
+    ZoneScopedN("mosaicNode::draw()");
     auto mainSettings = ofxImGui::Settings();
 
     std::string nodeName = "Node"+ofToString(this->_id);
@@ -162,14 +169,16 @@ void mosaicNode::draw(){ // not needed anymore ?
         ImGui::TextUnformatted("NEW PARAMETER API");
         ImGui::Separator();
 
+        {ZoneScopedN("Draw params");
         for(auto it=parameters.begin(); it!=parameters.end(); ++it){
             (*it)->drawImGuiEditable();
-        };
+        };}
     }
     ofxImGui::EndWindow(mainSettings);
 }
 //--------------------------------------------------------------
 void mosaicNode::drawObjectNodeGui( ImGuiEx::NodeCanvas& _nodeCanvas ){
+    ZoneScopedN("mosaicNode::drawObjectNodeGui()");
 
     ImVec2 imPos( this->x, this->y );
     ImVec2 imSize( this->width, this->height );

@@ -77,4 +77,12 @@ public:
     Parameter<std::string> myStringParam;
     Parameter<int> myIntParam;
     std::list< Parameter<int> > myDynamicParams; // note: cannot be vector, it re-allocates stored items, unvalidating pointers / references !
+
+    // Tracy stuff
+//    void* operator new(std::size_t count) {
+//    auto ptr = malloc(count); TracyAlloc(ptr, count); return ptr;
+//    }
+//    void operator delete(void* ptr) noexcept {
+//    TracyFree(ptr);
+//    free(ptr); }
 };
