@@ -1,5 +1,6 @@
 #include "mosaicNode.h"
 #include "Tracy.hpp"
+#include "ImHelpers.h"
 
 //--------------------------------------------------------------
 void mosaicNode::setup(){

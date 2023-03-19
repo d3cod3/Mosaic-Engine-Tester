@@ -5,12 +5,11 @@
  * Modified by n3m3da
  *
  */
-
-#include "imgui_plot.h"
-
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
+
+#include "imgui_plot.h"
 #include "imgui_internal.h"
 
 float imMap(float value, float inputMin, float inputMax, float outputMin, float outputMax, bool clamp){
@@ -365,7 +364,7 @@ void VUMeter(ImDrawList* drawList, float width, float height,float _vol){
     ImGuiWindow* Window = ImGui::GetCurrentWindow();
 
     // prepare canvas
-    const float dim = width > 0 ? width : ImGui::GetContentRegionAvailWidth();
+    const float dim = width > 0 ? width : ImGui::GetContentRegionAvail().x;
     ImVec2 Canvas(dim, height);
 
     ImRect bb(Window->DC.CursorPos, Window->DC.CursorPos + Canvas);
@@ -392,7 +391,7 @@ void PlotBands(ImDrawList* drawList, float width, float height, std::vector<floa
     ImGuiWindow* Window = ImGui::GetCurrentWindow();
 
     // prepare canvas
-    const float dim = width > 0 ? width : ImGui::GetContentRegionAvailWidth();
+    const float dim = width > 0 ? width : ImGui::GetContentRegionAvail().x;
     ImVec2 Canvas(dim, height);
 
     ImRect bb(Window->DC.CursorPos, Window->DC.CursorPos + Canvas);
