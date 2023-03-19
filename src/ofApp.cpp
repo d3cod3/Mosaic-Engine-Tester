@@ -79,11 +79,31 @@ void ofApp::draw(){
     ofSetLineWidth(1);
 
     this->gui.begin();
+
+    // Menu bar
+    ImGui::BeginMainMenuBar();
+    if(ImGui::BeginMenu( "File")){
+        ImGui::Separator();
+        if(ImGui::MenuItem( "Save" )){
+            // do something
+        }
+        if(ImGui::MenuItem( "Open" )){
+            // do something
+        }
+        if(ImGui::MenuItem( "Quit" )){
+            ofExit();
+        }
+        ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+
     ImGui::SetNextWindowPos(canvasViewport.getTopLeft(), ImGuiCond_Always );
     ImGui::SetNextWindowSize( ImVec2(canvasViewport.width, canvasViewport.height), ImGuiCond_Always );
     bool isCanvasVisible = nodeCanvas.Begin("ofxVPNodeCanvas" );
 
-    // END VP DRAW
+    // END MOSAIC DRAW
+
+    // BEGIN VP DRAW
 
     if ( isCanvasVisible ){
         ZoneScopedN("node Objects draw loop");
